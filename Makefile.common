@@ -186,6 +186,15 @@ ifneq ($(findstring Linux,$(OS)),)
    HAVE_UNIX = 1
 endif
 
+ifneq ($(findstring qnx,$(OS)),)
+   LIBS += -lscreen
+   OBJ += input/drivers/qnx_input.o \
+          input/drivers_joypad/qnx_joypad.o \
+          gfx/drivers_context/qnx_ctx.o \
+          frontend/drivers/platform_qnx.o
+   HAVE_UNIX = 1
+endif
+
 ifeq ($(HAVE_UNIX), 1)
    OBJ += frontend/drivers/platform_unix.o
 

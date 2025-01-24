@@ -13,32 +13,34 @@
  *  You should have received a copy of the GNU General Public License along with RetroArch.
  *  If not, see <http://www.gnu.org/licenses/>.
  */
+/*##########################################################################################*/
+/* QNX Changes:
+ * Authored by Jai Moraes 1/24/2025 M/D/Y
+ */
+/*##########################################################################################*/
 
+/*### Type Headers ###*/
 #include <stdint.h>
+#include <stdbool.h>
 
-#include <bps/screen.h>
-#include <bps/navigator.h>
-#include <bps/event.h>
+/*### Platform-Specifics ###*/
 #include <screen/screen.h>
 #include <sys/platform.h>
 
-#ifdef HAVE_CONFIG_H
+/*### Retro Arch ###*/
 #include "../../config.h"
-#endif
-
-#ifdef HAVE_EGL
-#include <EGL/egl.h>
-#endif
-
-#ifdef HAVE_EGL
-#include "../common/egl_common.h"
-#endif
-
 #include "../../configuration.h"
 #include "../../verbosity.h"
 
+/*### EGL ###*/
+#include <EGL/egl.h>
+#include "../common/egl_common.h"
+
 #define WINDOW_BUFFERS 2
 
+/*##############################################*/
+/*                  Structures                  */
+/*##############################################*/
 typedef struct
 {
 #ifdef HAVE_EGL
@@ -48,13 +50,20 @@ typedef struct
    bool resize;
 } qnx_ctx_data_t;
 
+/*##############################################*/
+/*                   Globals                    */
+/*##############################################*/
+/* Included via extern */
 /* TODO/FIXME - globals with public scope */
 screen_context_t screen_ctx;
 screen_window_t screen_win;
 
 
-static void gfx_ctx_qnx_destroy(void *data)
-{
+/**
+ * gfx_ctx_qnx_destroy:
+ * Destroys reference to the screen context.
+ */
+static void gfx_ctx_qnx_destroy(void *data){
    qnx_ctx_data_t *qnx = (qnx_ctx_data_t*)data;
 
 #ifdef HAVE_EGL
@@ -64,15 +73,17 @@ static void gfx_ctx_qnx_destroy(void *data)
    free(data);
 }
 
-static void *gfx_ctx_qnx_init(void *video_driver)
-{
-   EGLint n;
-   EGLint major, minor;
-   int usage, format;
-#ifndef HAVE_BB10
-   int angle, size[2];
+/**
+ * gfx_ctx_qnx_init:
+ * Initializes the screen context.
+ */
+static void *gfx_ctx_qnx_init(void *video_driver){
+   /* Declare useful variables */
+   EGLint n, major, minor;
+   int usage, format, angle, size[2];
    screen_display_mode_t screen_mode;
-#endif
+
+   /* EGL attributes */
    EGLint context_attributes[] = {
 #ifdef HAVE_OPENGLES2
            EGL_CONTEXT_CLIENT_VERSION, 2,
@@ -94,33 +105,20 @@ static void *gfx_ctx_qnx_init(void *video_driver)
       EGL_RED_SIZE, 8,
       EGL_NONE
    };
-   int screen_resolution[2];
-   qnx_ctx_data_t *qnx         = (qnx_ctx_data_t*)calloc(1, sizeof(*qnx));
 
-   if (!qnx)
-       goto screen_error;
+   /* Resolution */
+   int screen_resolution[2];
+
+   /* Allocate screen context */
+   qnx_ctx_data_t *qnx         = (qnx_ctx_data_t*)calloc(1, sizeof(*qnx));
+   if (!qnx) goto screen_error;
 
    /* Create a screen context that will be used to
     * create an EGL surface to receive libscreen events */
-
    RARCH_LOG("Initializing screen context...\n");
-   if (!screen_ctx)
-   {
-      screen_create_context(&screen_ctx, 0);
-      if (screen_request_events(screen_ctx) != BPS_SUCCESS)
-      {
+   if (!screen_ctx){
+      if (screen_create_context(&screen_ctx, 0) != 0 ){
          RARCH_ERR("screen_request_events failed.\n");
-         goto screen_error;
-      }
-      if (navigator_request_events(0) != BPS_SUCCESS)
-      {
-         RARCH_ERR("navigator_request_events failed.\n");
-         goto screen_error;
-      }
-      if (navigator_rotation_lock(false) != BPS_SUCCESS)
-      {
-         RARCH_ERR("navigator_location_lock failed.\n");
-         goto screen_error;
       }
    }
 
@@ -132,19 +130,15 @@ static void *gfx_ctx_qnx_init(void *video_driver)
       goto error;
 #endif
 
-   if (!screen_win)
-   {
-      if (screen_create_window(&screen_win, screen_ctx))
-      {
+   if (!screen_win){
+      if (screen_create_window(&screen_win, screen_ctx) != 0){
          RARCH_ERR("screen_create_window failed:.\n");
          goto error;
       }
    }
 
    format = SCREEN_FORMAT_RGBX8888;
-   if (screen_set_window_property_iv(screen_win,
-            SCREEN_PROPERTY_FORMAT, &format))
-   {
+   if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_FORMAT, &format)){
       RARCH_ERR("screen_set_window_property_iv [SCREEN_PROPERTY_FORMAT] failed.\n");
       goto error;
    }
@@ -154,28 +148,22 @@ static void *gfx_ctx_qnx_init(void *video_driver)
 #elif HAVE_OPENGLES3
    usage = SCREEN_USAGE_OPENGL_ES3 | SCREEN_USAGE_ROTATION;
 #endif
-   if (screen_set_window_property_iv(screen_win,
-            SCREEN_PROPERTY_USAGE, &usage))
-   {
+   if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_USAGE, &usage)){
       RARCH_ERR("screen_set_window_property_iv [SCREEN_PROPERTY_USAGE] failed.\n");
       goto error;
    }
 
-   if (screen_get_window_property_pv(screen_win,
-            SCREEN_PROPERTY_DISPLAY, (void **)&qnx->screen_disp))
-   {
+   if (screen_get_window_property_pv(screen_win, SCREEN_PROPERTY_DISPLAY, (void **)&qnx->screen_disp)){
       RARCH_ERR("screen_get_window_property_pv [SCREEN_PROPERTY_DISPLAY] failed.\n");
       goto error;
    }
 
-   if (screen_get_display_property_iv(qnx->screen_disp,
-            SCREEN_PROPERTY_SIZE, screen_resolution))
-   {
+   if (screen_get_display_property_iv(qnx->screen_disp, SCREEN_PROPERTY_SIZE, screen_resolution)){
       RARCH_ERR("screen_get_window_property_iv [SCREEN_PROPERTY_SIZE] failed.\n");
       goto error;
    }
 
-#ifndef HAVE_BB10
+   //STOPPED HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    angle = atoi(getenv("ORIENTATION"));
 
    if (screen_get_display_property_pv(qnx->screen_disp,
@@ -231,7 +219,6 @@ static void *gfx_ctx_qnx_init(void *video_driver)
       RARCH_ERR("screen_set_window_property_iv [SCREEN_PROPERTY_ROTATION] failed.\n");
       goto error;
    }
-#endif
 
    if (screen_create_window_buffers(screen_win, WINDOW_BUFFERS))
    {
@@ -248,7 +235,7 @@ error:
    egl_report_error();
    gfx_ctx_qnx_destroy(video_driver);
 screen_error:
-   screen_stop_events(screen_ctx);
+   //screen_stop_events(screen_ctx);
    return NULL;
 }
 

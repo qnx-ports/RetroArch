@@ -14,11 +14,13 @@
  *  You should have received a copy of the GNU General Public License along with RetroArch.
  *  If not, see <http://www.gnu.org/licenses/>.
  */
+/*##########################################################################################*/
+/* QNX Changes:
+ * Authored by Jai Moraes 1/24/2025 M/D/Y
+ */
+/*##########################################################################################*/
 
-#include "../../config.def.h"
-
-#include "../../tasks/tasks_internal.h"
-#include "../../configuration.h"
+#include "../drivers/qnx_input.h"
 
 static const char *qnx_joypad_name(unsigned pad)
 {

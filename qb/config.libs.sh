@@ -55,6 +55,8 @@ elif [ "$OS" = 'Cygwin' ]; then
    die 1 'Error: Cygwin is not a supported platform. See https://bot.libretro.com/docs/compilation/windows/'
 elif [ "$OS" = 'SunOS' ]; then
    SORT='gsort'
+elif [ "$OS" = 'qnx' ]; then
+   DYLIB=""
 fi
 
 add_define MAKEFILE DATA_DIR "$SHARE_DIR"
@@ -175,6 +177,8 @@ fi
 check_platform 'Linux Win32' CDROM 'CD-ROM is' user
 
 if [ "$OS" = 'Win32' ]; then
+   add_opt DYLIB yes
+elif [ "$OS" = 'qnx' ]; then
    add_opt DYLIB yes
 else
    check_lib '' DYLIB "$DYLIB" dlopen

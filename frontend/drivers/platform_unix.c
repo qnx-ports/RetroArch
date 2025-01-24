@@ -2518,7 +2518,9 @@ VALGRIND_PRINTF_BACKTRACE("SIGINT");
 static void frontend_unix_install_signal_handlers(void)
 {
    struct sigaction sa;
-
+   #ifdef __QNX__
+   #define SA_RESTART 0
+   #endif
    sa.sa_sigaction = NULL;
    sa.sa_handler   = frontend_unix_sighandler;
    sa.sa_flags     = SA_RESTART;

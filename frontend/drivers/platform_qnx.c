@@ -14,45 +14,44 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*### Type Headers ###*/
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <boolean.h>
+
+/*### System Headers ###*/
 #include <libgen.h>
 #include <dirent.h>
 
-#include <bps/bps.h>
-#include <packageinfo.h>
-
-#include <boolean.h>
+/*### Standard Headers ###*/
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
 
+/*### Retro Arch ###*/
 #include "../../defaults.h"
 #include "../../dynamic.h"
 #include "../../paths.h"
 #include "../../verbosity.h"
+#include "../frontend_driver.h"
+#include "../../file_path_special.h"
 
-static void frontend_qnx_init(void *data)
-{
+static void frontend_qnx_init(void *data){
    verbosity_enable();
-   bps_initialize();
+   //bps_initialize();
 }
 
-static void frontend_qnx_shutdown(bool unused)
-{
-   bps_shutdown();
+static void frontend_qnx_shutdown(bool unused){
+   //bps_shutdown();
 }
 
-static int frontend_qnx_get_rating(void)
-{
+static int frontend_qnx_get_rating(void){
    /* TODO/FIXME - look at unique identifier per device and
     * determine rating for some */
    return -1;
 }
 
-static void frontend_qnx_get_env_settings(int *argc, char *argv[],
-      void *data, void *params_data)
-{
+static void frontend_qnx_get_env_settings(int *argc, char *argv[], void *data, void *params_data){
    unsigned i;
    char assets_path[PATH_MAX];
    char data_path[PATH_MAX];
@@ -63,23 +62,17 @@ static void frontend_qnx_get_env_settings(int *argc, char *argv[],
 
    getcwd(workdir, sizeof(workdir));
 
-   if (!string_is_empty(workdir))
-   {
+   if (!string_is_empty(workdir)){
       assets_path[0]               = '\0';
       data_path[0]                 = '\0';
       user_path[0]                 = '\0';
       tmp_path[0]                  = '\0';
-      snprintf(assets_path, sizeof(data_path),
-            "%s/app/native/assets", workdir);
-      snprintf(data_path, sizeof(data_path),
-            "%s/data", workdir);
-      snprintf(user_path, sizeof(user_path),
-            "%s/shared/misc/retroarch", workdir);
-      snprintf(tmp_path, sizeof(user_path),
-            "%s/tmp", workdir);
+      snprintf(assets_path, sizeof(data_path), "%s/app/native/assets", workdir);
+      snprintf(data_path, sizeof(data_path), "%s/data", workdir);
+      snprintf(user_path, sizeof(user_path), "%s/shared/misc/retroarch", workdir);
+      snprintf(tmp_path, sizeof(user_path), "%s/tmp", workdir);
    }
-   else
-   {
+   else{
       strlcpy(assets_path, "app/native/assets", sizeof(assets_path));
       strlcpy(data_path, "data", sizeof(data_path));
       strlcpy(user_path, "shared/misc/retroarch", sizeof(user_path));
@@ -141,8 +134,7 @@ static void frontend_qnx_get_env_settings(int *argc, char *argv[],
    fill_pathname_join_special(data_assets_path,
 		   data_path, "assets", sizeof(data_assets_path));
 
-   if (!filestream_exists(data_assets_path))
-   {
+   if (!filestream_exists(data_assets_path)){
       char copy_command[PATH_MAX] = {0};
 
       snprintf(copy_command,
@@ -163,9 +155,12 @@ static void frontend_qnx_get_env_settings(int *argc, char *argv[],
 #endif
 }
 
-enum frontend_architecture frontend_qnx_get_arch(void)
-{
+enum frontend_architecture frontend_qnx_get_arch(void){
+#ifdef __x86_64__
+   return FRONTEND_ARCH_X86_64;
+#else
    return FRONTEND_ARCH_ARM;
+#endif
 }
 
 frontend_ctx_driver_t frontend_ctx_qnx = {
