@@ -57,6 +57,10 @@ elif [ "$OS" = 'SunOS' ]; then
    SORT='gsort'
 elif [ "$OS" = 'qnx' ]; then
    DYLIB=""
+   PTHREADLIB=""
+   SOCKETHEADER="#include <io-sock.h>"
+   SOCKETLIB=-lsocket
+   EXTRA_GL_LIBS='-lGLESv2 -lEGL'
 fi
 
 add_define MAKEFILE DATA_DIR "$SHARE_DIR"

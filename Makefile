@@ -142,6 +142,15 @@ else
    LINK = $(CC)
 endif
 
+ifneq ($(findstring qnx,$(OS)),)
+	ifneq ($(findstring gcc_ntoaarch64le,$(CXXFLAGS)),)
+		LINK += -Vgcc_ntoaarch64le_cxx
+	else
+		LINK += -Vgcc_ntox86_64_cxx
+	endif
+endif
+
+
 RARCH_OBJ := $(addprefix $(OBJDIR)/,$(OBJ))
 
 ifneq ($(X86),)

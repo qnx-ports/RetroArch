@@ -193,6 +193,7 @@ ifneq ($(findstring qnx,$(OS)),)
           gfx/drivers_context/qnx_ctx.o \
           frontend/drivers/platform_qnx.o
    HAVE_UNIX = 1
+   NEED_CXX_LINKER = 1
 endif
 
 ifeq ($(HAVE_UNIX), 1)
