@@ -304,10 +304,13 @@ VIDEO CONTEXT
 #include "../gfx/common/vulkan_common.c"
 #include "../gfx/drivers_display/gfx_display_vulkan.c"
 #include "../libretro-common/vulkan/vulkan_symbol_wrapper.c"
-#ifdef HAVE_VULKAN_DISPLAY
+#if defined(__QNX__)
 #include "../gfx/drivers_context/khr_display_ctx.c"
 #endif
+#elif defined( HAVE_VULKAN_DISPLAY)
+#include "../gfx/drivers_context/qnx_vk_ctx.c"
 #endif
+
 
 #if defined(HAVE_KMS)
 #include "../gfx/drivers_context/drm_ctx.c"

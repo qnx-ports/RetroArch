@@ -67,4 +67,9 @@
 #include "vulkan_xlib_xrandr.h"
 #endif
 
+#ifdef VK_USE_PLATFORM_SCREEN_QNX
+#include <screen/screen.h>
+#include "vulkan_qnx.h"
+#endif
+
 #endif /* VULKAN_H_ */

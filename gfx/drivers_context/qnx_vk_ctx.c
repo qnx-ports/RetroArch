@@ -1,0 +1,474 @@
+/*  RetroArch - A frontend for libretro.
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2017 - Daniel De Matteis
+ *
+ *  RetroArch is free software: you can redistribute it and/or modify it under the terms
+ *  of the GNU General Public License as published by the Free Software Found-
+ *  ation, either version 3 of the License, or (at your option) any later version.
+ *
+ *  RetroArch is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ *  PURPOSE.  See the GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along with RetroArch.
+ *  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* QNX Changes:
+ * Authored by Jai Moraes 1/31/2025 M/D/Y
+ */
+/*##########################################################################################*/
+
+/*### Standard Headers ###*/
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef HAVE_CONFIG_H
+#include "../../config.h"
+#endif
+
+/*### Platform-Specifics ###*/
+#include <screen/screen.h>
+#include <sys/platform.h>
+#include <errno.h>
+
+/*### Retro Arch ###*/
+#include "../../config.h"
+#include "../../configuration.h"
+#include "../../verbosity.h"
+#include <retro_timers.h>
+
+#include "../include/vulkan/vulkan.h"
+#include "../common/vksym.h"
+#include <libretro_vulkan.h>
+
+/*### Vulkan ###*/
+#include "../common/vulkan_common.h"
+
+/*##############################################*/
+/*                  Structures                  */
+/*##############################################*/
+typedef struct {
+    gfx_ctx_vulkan_data_t vk;
+    screen_context_t ctx;
+    screen_window_t win;
+    unsigned width;
+    unsigned height;
+    unsigned swap_interval;
+} qnx_ctx_data_vk_t; 
+
+/*##############################################*/
+/*                  Functions                   */
+/*##############################################*/
+
+/**
+ * qnx_gfx_ctx_vk_destroy
+ * Destroys the gfx context
+ */
+static void qnx_gfx_ctx_vk_destroy(void *data) {
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+
+    if(!qnx) return;
+    vulkan_context_destroy(&qnx->vk, qnx->ctx);
+
+    if (qnx->vk.context.queue_lock)
+        slock_free(qnx->vk.context.queue_lock);
+    screen_destroy_window(qnx->win);
+    screen_destroy_context(qnx->ctx);
+    free(qnx->win);
+    free(qnx->ctx);
+    free(data);
+
+} /*qnx_gfx_ctx_vk_destroy*/
+
+static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){  
+    char * buf = malloc(64*sizeof(char));
+    if(!buf){
+        RARCH_LOG("[Screen/VK]: Failed to allocate memory for display qnx info.\n");
+        return;
+    }
+    int len = 63;
+
+    RARCH_LOG("=============================\n");
+    RARCH_LOG("QNX Display, Ctx, Window Info\n");
+    RARCH_LOG("=============================\n");
+
+    if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_ID_STRING, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query context for id_str with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Context ID String: %s\n", buf);
+
+    if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_PRODUCT, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query context for pid with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Context Product ID String: %s\n", buf);
+
+    if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_VENDOR, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query context for vid with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Context Vendor ID String: %s\n", buf);
+
+    RARCH_LOG("-----------------------------\n");
+    
+    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_ID_STRING, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query window for id_str with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window ID String: %s\n", buf);
+
+    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_PRODUCT, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query window for pid with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Product ID String: %s\n", buf);
+
+    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_VENDOR, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query window for vid with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Vendor ID String: %s\n", buf);
+
+    RARCH_LOG("-----------------------------\n");
+
+    int num_disps = 0;
+    if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_DISPLAY_COUNT, &num_disps)){
+        RARCH_LOG("[Screen/VK]: Failed to query context for display pointers with errno %d.\n", errno);
+    }else{
+        RARCH_LOG("[Screen/VK]: %d displays detected in context.\n");
+        if(num_disps > 0){
+            screen_display_t* disps = malloc(sizeof(screen_display_t)*num_disps);
+            if(screen_get_context_property_pv(qnx->ctx, SCREEN_PROPERTY_DISPLAYS, disps)){
+                RARCH_LOG("[Screen/VK]: %d display(s) detected in context.\n");
+            }else{
+                for(int i = 0; i < num_disps; i++){
+                    RARCH_LOG("[Screen/VK]: Info for Display %d%s\n", i, i==0?" [default]":"");
+                    if(!disps[i]){
+                        RARCH_LOG("[Screen/VK]: Display pointer %d is invalid.\n", i);
+                    }else{
+                        if(screen_get_display_property_cv(disps[i], SCREEN_PROPERTY_ID_STRING, len, buf))
+                            RARCH_LOG("[Screen/VK]: Failed to query display for id_str with errno %d.\n", errno);
+                        else RARCH_LOG("[Screen/VK]: Display ID String: %s\n", buf);
+
+                        if(screen_get_display_property_cv(disps[i], SCREEN_PROPERTY_PRODUCT, len, buf))
+                            RARCH_LOG("[Screen/VK]: Failed to query display for pid with errno %d.\n", errno);
+                        else RARCH_LOG("[Screen/VK]: Display Product ID String: %s\n", buf);
+
+                        if(screen_get_display_property_cv(disps[i], SCREEN_PROPERTY_VENDOR, len, buf))
+                            RARCH_LOG("[Screen/VK]: Failed to query display for vid with errno %d.\n", errno);
+                        else RARCH_LOG("[Screen/VK]: Display Vendor ID String: %s\n", buf);
+                    }
+                }
+            }
+        }
+    }
+    RARCH_LOG("=============================\n");
+    free(buf);
+}
+
+/**
+ * qnx_gfx_ctx_vk_init
+ * Initializes the gfx context
+ */
+static void *qnx_gfx_ctx_vk_init(void *video_driver) {
+    RARCH_LOG("[Screen/VK]: Using Screen Driver!\n");
+
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
+    if(!qnx){
+        RARCH_ERR("[Screen/VK]: Fatal: Could not create a data pointer.");
+        return false;
+    }
+
+    RARCH_LOG("[Screen/VK]: Initializing vulkan context...\n");
+    if(!vulkan_context_init(&qnx->vk, VULKAN_WSI_QNX)){
+        RARCH_ERR("[Screen/VK]: Failed to initialize vulkan context. Destroying Window and Context.\n");
+        free(qnx);
+        return NULL;
+    }
+
+    screen_context_t* screen_ctx = malloc(sizeof(screen_context_t));
+    screen_window_t* screen_win = malloc(sizeof(screen_window_t));
+    if(screen_create_context(screen_ctx, SCREEN_APPLICATION_CONTEXT)){
+        RARCH_ERR("[Screen/VK]: Fatal: Context init failed with errno %d.\n", errno);
+        free(qnx);
+        return false;
+    }
+    
+    if(screen_create_window_type(screen_win, *screen_ctx, SCREEN_APPLICATION_WINDOW)){
+        RARCH_ERR("[Screen/VK]: Fatal: Window init failed with errno %d.\n", errno);
+        screen_destroy_context(*screen_ctx);
+        free(screen_ctx);
+        free(qnx);
+        return false;
+    }
+
+    int usage = SCREEN_USAGE_VULKAN;
+    if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_USAGE, &usage))
+        RARCH_WARN("[Screen/VK]: Could not set window type to SCREEN_USAGE VULKAN, errno %d.\n", errno);
+
+    RARCH_LOG("[Screen/VK]: Context, Window initialized.\n");
+
+    /*
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
+    if(!qnx){
+        RARCH_ERR("[Screen/VK]: Fatal: Could not create a data pointer.");
+        screen_destroy_window(*screen_win);
+        screen_destroy_context(*screen_ctx);
+        free(screen_win);
+        free(screen_ctx);
+        return false;
+    }
+
+    RARCH_LOG("[Screen/VK]: Initializing vulkan context...\n");
+    if(!vulkan_context_init(&qnx->vk, VULKAN_WSI_QNX)){
+        RARCH_ERR("[Screen/VK]: Failed to initialize vulkan context. Destroying Window and Context.\n");
+        qnx_gfx_ctx_vk_destroy(qnx);
+        free(screen_win);
+        free(screen_ctx);
+        return NULL;
+    }
+    */
+
+    qnx->ctx  = *screen_ctx;
+    qnx->win  = *screen_win;
+
+    int size[2] = {0,0};
+    RARCH_LOG("[Screen/VK]: Getting screen size...\n");
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+        RARCH_ERR("[Screen/VK]: Failed to get screen size with errno %d.\n", errno);
+    else
+        RARCH_LOG("[Screen/VK]: Screen Size: %d x %d \n", size[0], size[1]);
+
+    get_display_info_qnx(qnx);
+    
+    if(min(size[0], size[1]) < 0 || min(size[0], size[1]) > 100000){
+        RARCH_LOG("[Screen/VK]: Window size invalid! Setting to 1920x1080\n");
+        size[0] = 1920;
+        size[1] = 1080;
+        if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+            RARCH_LOG("[Screen/VK]: Failed to set window size with errno %d.\n", errno);
+    }
+
+    qnx->width  = size[0];
+    qnx->height = size[1];
+
+    free(screen_win);
+    free(screen_ctx);
+
+    return qnx;
+} /*qnx_gfx_ctx_vk_init*/
+
+static enum gfx_ctx_api qnx_gfx_ctx_vk_get_api(void *data){
+   return GFX_CTX_VULKAN_API;
+}
+
+static bool qnx_gfx_ctx_vk_bind_api(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor){
+   return (api == GFX_CTX_VULKAN_API);
+}
+
+/**
+ * TODO Comments
+ */
+static bool qnx_gfx_ctx_vk_set_video_mode(void *data, unsigned width, unsigned height, bool fullscreen){
+    RARCH_LOG("[Screen/VK]: Setting video mode.\n");
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+    if(!qnx){
+        RARCH_ERR("[Screen/VK]: Null Data Pointer.");
+        return false;
+    }
+
+    int size[2] = {0,0}, /*size_d[2],*/ swap_interval = 0/*, ndisplays*/; 
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+        RARCH_ERR("[Screen/VK]: Failed to get screen sizes from window with errno %d.", errno);
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
+        RARCH_ERR("[Screen/VK]: Failed to get swap interval from window with errno %d.", errno);
+
+    if(!vulkan_surface_create(&qnx->vk, VULKAN_WSI_QNX, &qnx->ctx, &qnx->win, size[0], size[1], swap_interval)){ 
+        RARCH_ERR("[Screen/VK]: Failed to create surface.\n");
+        return false;
+    }
+
+    return true;
+}
+
+static void qnx_gfx_ctx_vk_set_swap_interval(void *data, int swap_interval){
+    RARCH_LOG("[Screen/VK]: Setting swap interval...\n");
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+    if(!qnx){
+        RARCH_ERR("[Screen/VK]: Invalid Data passed to qnx_gfx_ctx_vk_set_swap_interval.\n");
+        return;
+    }
+
+    if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
+        RARCH_ERR("[Screen/VK]: Setting swap interval of window failed with errno %d.\n", errno);
+}
+
+static void qnx_gfx_ctx_vk_get_video_size(void *data, unsigned *width, unsigned *height){
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+    if(!qnx){
+        RARCH_ERR("[Screen/VK]: Invalid data passed to qnx_gfx_ctx_vk_get_video_size\n");
+        return;
+    }
+    int size[2] = {0,0};
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size)){
+        RARCH_ERR("[Screen/VK]: Failed to get video size. Setting default values...\n");
+        //Lilliput Defaults
+        size[0] = 1920;
+        size[1] = 1080;
+    }
+    *width = (unsigned) size[0];
+    *height = (unsigned) size[1];
+}
+
+static bool qnx_gfx_ctx_vk_has_focus(void *data){
+    uint_t focused = 0;
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+
+    screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_FOCUS, &focused);
+    return (focused != 0)? true: false; /*I know this is unneeded, but bools can be strange*/
+}
+
+static bool qnx_gfx_ctx_vk_suppress_screensaver(void *data, bool enable) { 
+    return false; 
+}
+
+static void qnx_gfx_ctx_vk_check_window(void *data, bool *quit, bool *resize, unsigned *width, unsigned *height){
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+    uint_t new_width, new_height, size[2];
+    *quit=false; //TODO: CHECK VIA EVENTS
+
+    screen_get_window_property_iv(qnx->ctx, SCREEN_PROPERTY_SIZE, &size);
+
+    if(new_width!=qnx->width || new_height!=qnx->height){
+        *width=new_width;
+        *height=new_height;
+        *resize=true;
+        qnx->width=new_width;
+        qnx->height=new_height;
+    }
+}
+
+static int dpi_get_density(qnx_ctx_data_vk_t *qnx){
+    int screen_dpi[2];
+
+    if(!qnx) return -1;
+
+    screen_device_t disp;
+    if(screen_get_window_property_pv(qnx->win, SCREEN_PROPERTY_DISPLAY, &disp)) goto error;
+    if(screen_get_display_property_iv(disp, SCREEN_PROPERTY_DPI, &screen_dpi)) goto error;
+
+    return min(screen_dpi[0], screen_dpi[1]);
+
+    error:
+    RARCH_ERR("screen failed to get DPI\n");
+    return NULL;
+}
+
+
+static bool qnx_gfx_ctx_vk_get_metrics(void *data, enum display_metric_types type, float *value){
+    RARCH_LOG("[Screen/VK]: Get Metrics running.\n");
+    static int dpi = -1;
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+
+    switch(type){
+        case DISPLAY_METRIC_MM_WIDTH:
+        case DISPLAY_METRIC_MM_HEIGHT:
+            return false;
+        case DISPLAY_METRIC_DPI:
+            if(dpi == -1){
+                dpi = dpi_get_density(qnx);
+            }
+            if(dpi <= 0){
+                //TODO: Needs to be investigated as a fallback, perhaps the dpi of the lilliput
+                dpi = 345;
+                *value = (float)dpi;
+                return true;
+            }
+            *value = (float)dpi;
+            break;
+            case DISPLAY_METRIC_NONE:
+            default:
+                *value = 0;
+                return false;
+    }
+    return true;
+}
+
+static void qnx_gfx_ctx_vk_swap_buffers(void *data){
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+
+    if(qnx->vk.context.flags & VK_CTX_FLAG_HAS_ACQUIRED_SWAPCHAIN){
+        qnx->vk.context.flags &= ~VK_CTX_FLAG_HAS_ACQUIRED_SWAPCHAIN;
+        if(qnx->vk.swapchain == VK_NULL_HANDLE){
+            retro_sleep(10);
+        }else
+            vulkan_present(&(qnx->vk), qnx->vk.context.current_swapchain_index);
+    }
+    vulkan_acquire_next_image(&(qnx->vk));
+}
+
+static void qnx_gfx_ctx_vk_input_driver (void *data, const char *joypad_name, input_driver_t **input, void **input_data){
+    void *qnxinput  = input_driver_init_wrap(&input_qnx, joypad_name);
+   *input           = qnxinput ? &input_qnx : NULL;
+   *input_data      = qnxinput;
+}
+
+static uint32_t qnx_gfx_ctx_vk_get_flags(void *data)
+{
+   uint32_t flags = 0;
+
+   BIT32_SET(flags, GFX_CTX_FLAGS_SHADERS_SLANG);
+
+   return flags;
+}
+
+static void qnx_gfx_ctx_vk_set_flags(void *data, uint32_t flags) { }
+static void qnx_gfx_ctx_vk_bind_hw_render(void *data, bool enable){ }
+
+static void* qnx_gfx_ctx_vk_get_context_data(void *data){
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
+    return &qnx->vk.context;
+}
+
+static bool qnx_gfx_ctx_vk_set_resize(void *data, unsigned width, unsigned height){
+    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*) data;
+    if(!qnx){
+        RARCH_ERR("[Screen/VK]: Invalid data pointer passed to qnx_gfx_ctx_vk_set_resize\n");
+        return false;
+    }
+
+    if(!vulkan_create_swapchain(&qnx->vk, qnx->width, qnx->height, qnx->swap_interval)){
+      RARCH_ERR("[Screen/VK]: Failed to update swapchain.\n");
+      return false;
+    }
+    return true;
+}
+
+static gfx_ctx_proc_t qnx_gfx_ctx_vk_get_proc_address(const char *symbol) { return NULL; }
+
+/*##############################################*/
+/*              Driver Structure                */
+/*##############################################*/
+
+const gfx_ctx_driver_t gfx_ctx_qnx_vk = {
+   qnx_gfx_ctx_vk_init,
+   qnx_gfx_ctx_vk_destroy,
+   qnx_gfx_ctx_vk_get_api,
+   qnx_gfx_ctx_vk_bind_api,
+   qnx_gfx_ctx_vk_set_swap_interval,
+   qnx_gfx_ctx_vk_set_video_mode,
+   qnx_gfx_ctx_vk_get_video_size,
+   NULL, /* get_refresh_rate */
+   NULL, /* get_video_output_size */
+   NULL, /* get_video_output_prev */
+   NULL, /* get_video_output_next */
+   qnx_gfx_ctx_vk_get_metrics,
+   NULL,
+   NULL, /* update_title */
+   qnx_gfx_ctx_vk_check_window,
+   qnx_gfx_ctx_vk_set_resize, 
+   qnx_gfx_ctx_vk_has_focus,
+   qnx_gfx_ctx_vk_suppress_screensaver,
+   false, /* has_windowed */
+   qnx_gfx_ctx_vk_swap_buffers,
+   qnx_gfx_ctx_vk_input_driver,
+   qnx_gfx_ctx_vk_get_proc_address,
+   NULL,
+   NULL,
+   NULL,
+   "vk_qnx",
+   qnx_gfx_ctx_vk_get_flags,
+   qnx_gfx_ctx_vk_set_flags,
+   qnx_gfx_ctx_vk_bind_hw_render,
+   qnx_gfx_ctx_vk_get_context_data,
+   NULL
+};

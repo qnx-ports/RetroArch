@@ -55,6 +55,10 @@
 #define VK_USE_PLATFORM_IOS_MVK
 #endif
 
+#ifdef __QNX__
+#define VK_USE_PLATFORM_SCREEN_QNX
+#endif
+
 #include <vulkan/vulkan_symbol_wrapper.h>
 
 #endif

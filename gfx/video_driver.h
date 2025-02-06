@@ -1405,6 +1405,7 @@ extern const gfx_ctx_driver_t gfx_ctx_w_vk;
 extern const gfx_ctx_driver_t gfx_ctx_wgl;
 extern const gfx_ctx_driver_t gfx_ctx_videocore;
 extern const gfx_ctx_driver_t gfx_ctx_qnx;
+extern const gfx_ctx_driver_t gfx_ctx_qnx_vk;
 extern const gfx_ctx_driver_t gfx_ctx_cgl;
 extern const gfx_ctx_driver_t gfx_ctx_cocoagl;
 extern const gfx_ctx_driver_t gfx_ctx_cocoavk;

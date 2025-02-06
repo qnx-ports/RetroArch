@@ -87,6 +87,7 @@ enum vulkan_wsi_type
    VULKAN_WSI_DISPLAY,
    VULKAN_WSI_MVK_MACOS,
    VULKAN_WSI_MVK_IOS,
+   VULKAN_WSI_QNX,
 };
 
 #ifdef VULKAN_HDR_SWAPCHAIN

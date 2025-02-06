@@ -1836,6 +1836,9 @@ static VkInstance vulkan_context_create_instance_wrapper(void *opaque, const VkI
       case VULKAN_WSI_MVK_IOS:
          instance_extensions[info.enabledExtensionCount++] = "VK_MVK_ios_surface";
          break;
+      case VULKAN_WSI_QNX:
+         instance_extensions[info.enabledExtensionCount++] = "VK_QNX_screen_surface";
+         break;
       case VULKAN_WSI_NONE:
       default:
          break;
@@ -2478,6 +2481,28 @@ bool vulkan_surface_create(gfx_ctx_vulkan_data_t *vk,
             if (create(vk->context.instance, &surf_info, NULL, &vk->vk_surface)
                 != VK_SUCCESS)
                return false;
+         }
+#endif
+         break;
+      case VULKAN_WSI_QNX:
+#ifdef __QNX__
+#include <screen/screen.h>
+         {
+         VkScreenSurfaceCreateInfoQNX create_info;
+         PFN_vkCreateScreenSurfaceQNX create;
+         if (!VULKAN_SYMBOL_WRAPPER_LOAD_INSTANCE_SYMBOL(vk->context.instance, "vkCreateScreenSurfaceQNX", create))
+            return false;
+         create_info.sType = VK_STRUCTURE_TYPE_SCREEN_SURFACE_CREATE_INFO_QNX;
+         create_info.pNext = NULL;
+         create_info.flags = 0;
+         create_info.context = *((screen_context_t*) (display));
+         create_info.window = *((screen_window_t*) (surface));
+
+         RARCH_LOG("[Screen/VK] Creating screen surface...\n");
+         if(create(vk->context.instance, &create_info, NULL, &vk->vk_surface)!= VK_SUCCESS){
+            RARCH_ERR("[Screen/VK] Error creating screen surface \n");
+            return false;
+         }
          }
 #endif
          break;

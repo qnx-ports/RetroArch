@@ -191,6 +191,7 @@ ifneq ($(findstring qnx,$(OS)),)
    OBJ += input/drivers/qnx_input.o \
           input/drivers_joypad/qnx_joypad.o \
           gfx/drivers_context/qnx_ctx.o \
+          gfx/drivers_context/qnx_vk_ctx.o \
           frontend/drivers/platform_qnx.o
    HAVE_UNIX = 1
    NEED_CXX_LINKER = 1

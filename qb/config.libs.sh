@@ -135,7 +135,11 @@ else
    check_header '' EGL EGL/egl.h EGL/eglext.h
    # some systems have EGL libs, but no pkgconfig
    # https://github.com/linux-sunxi/sunxi-mali/pull/8
+   if [ "$OS" = "qnx" ]; then 
+   HAVE_EGL="yes"
+   else
    check_val '' EGL "-l${VC_PREFIX}EGL $EXTRA_GL_LIBS" '' "${VC_PREFIX}egl" '' '' true
+   fi
 fi
 
 if [ "$HAVE_EGL" = 'yes' ]; then
