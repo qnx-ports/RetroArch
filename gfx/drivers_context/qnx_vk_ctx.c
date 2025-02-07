@@ -64,7 +64,8 @@ typedef struct {
  * qnx_gfx_ctx_vk_destroy
  * Destroys the gfx context
  */
-static void qnx_gfx_ctx_vk_destroy(void *data) {
+static void qnx_gfx_ctx_vk_destroy(void *data){
+    RARCH_LOG("qnx_gfx_ctx_vk_destroy\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
     if(!qnx) return;
@@ -82,6 +83,7 @@ static void qnx_gfx_ctx_vk_destroy(void *data) {
 
 static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){  
     char * buf = malloc(64*sizeof(char));
+    int buf_i = -1;
     if(!buf){
         RARCH_LOG("[Screen/VK]: Failed to allocate memory for display qnx info.\n");
         return;
@@ -100,23 +102,67 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){
         RARCH_LOG("[Screen/VK]: Failed to query context for pid with errno %d.\n", errno);
     else RARCH_LOG("[Screen/VK]: Context Product ID String: %s\n", buf);
 
-    if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_VENDOR, len, buf))
+    if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_ID, len, buf))
         RARCH_LOG("[Screen/VK]: Failed to query context for vid with errno %d.\n", errno);
-    else RARCH_LOG("[Screen/VK]: Context Vendor ID String: %s\n", buf);
+    else RARCH_LOG("[Screen/VK]: Context ID (Generated): %s\n", buf);
+
+    if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_STATUS, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query context for status with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Context Status: %d [0=DESTRYD., 1=CREATED]\n", buf_i);
+
+    if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_TYPE, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query context for type with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Context Type: %d [0=APP, 1=WIN_MGR, 2=INP_PVDR, 4=PWR_MGR, 8=DISP_MGR, 16=INP_MGR, 32=BUF_PVR]\n", buf_i);
+
+    if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_WINDOW_COUNT, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query context for Window count with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Context Window Count: %d\n", buf_i);
+
+    if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_IDLE_STATE, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query context for idle state with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Context Idle: %s\n", buf_i?"Idle":"Not Idle");
 
     RARCH_LOG("-----------------------------\n");
     
+    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_ID, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query window for id with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window ID (generated): %s\n", buf);
+
     if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_ID_STRING, len, buf))
         RARCH_LOG("[Screen/VK]: Failed to query window for id_str with errno %d.\n", errno);
     else RARCH_LOG("[Screen/VK]: Window ID String: %s\n", buf);
 
-    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_PRODUCT, len, buf))
-        RARCH_LOG("[Screen/VK]: Failed to query window for pid with errno %d.\n", errno);
-    else RARCH_LOG("[Screen/VK]: Window Product ID String: %s\n", buf);
+    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_CLASS, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query window for class with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Class: %s\n", buf);
 
-    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_VENDOR, len, buf))
-        RARCH_LOG("[Screen/VK]: Failed to query window for vid with errno %d.\n", errno);
-    else RARCH_LOG("[Screen/VK]: Window Vendor ID String: %s\n", buf);
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_TYPE, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query window for type with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Type: %d [0=app, 1=child, 2=embed, 4=root]\n", buf_i);
+
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query window for render buffer count with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Render Buffer Count: %d\n", buf_i);
+    
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_STATUS, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query window for status with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Status: %d [<0=ERROR, 0=DESTRYD., 1=CREATED, 2=REALIZ., 3=INVIS., 4/5=OBSC. , 9=VISIB., 10=FULL VIS., 11=FULLSCR.]\n", buf_i);
+
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_VISIBLE, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query window for visibility with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Visibility: %d\n", buf_i);
+
+    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_GROUP, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query window for group with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Group: %s\n", buf);
+
+    if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_PARENT, len, buf))
+        RARCH_LOG("[Screen/VK]: Failed to query window for parent with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Parent: %s\n", buf);
+
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_FORMAT, &buf_i))
+        RARCH_LOG("[Screen/VK]: Failed to query window for type with errno %d.\n", errno);
+    else RARCH_LOG("[Screen/VK]: Window Format: %d [See Docs]\n", buf_i);
 
     RARCH_LOG("-----------------------------\n");
 
@@ -146,6 +192,24 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){
                         if(screen_get_display_property_cv(disps[i], SCREEN_PROPERTY_VENDOR, len, buf))
                             RARCH_LOG("[Screen/VK]: Failed to query display for vid with errno %d.\n", errno);
                         else RARCH_LOG("[Screen/VK]: Display Vendor ID String: %s\n", buf);
+
+                        int nforms = 0;
+                        if(screen_get_display_property_iv(disps[i], SCREEN_PROPERTY_FORMAT_COUNT, &nforms))
+                            RARCH_LOG("[Screen/VK]: Failed to query display for format count with errno %d.\n", errno);
+                        else if(nforms > 0){
+                            RARCH_LOG("[Screen/VK]: Display returned %d valid formats.\n", nforms);
+                            int* forms = malloc(sizeof(int)*nforms);
+                            if(forms){
+                                if(screen_get_display_property_iv(disps[i], SCREEN_PROPERTY_FORMATS,forms))
+                                    RARCH_LOG("[Screen/VK]: Failed to query display for valid formats with errno %d.\n", errno);
+                                else{
+                                    for(int i = 0; i < nforms; i++)
+                                        RARCH_LOG("[Screen/VK]: Supports format type %d.\n", forms[i]);
+                                }
+                                free(forms);
+                            }
+                        }else
+                            RARCH_LOG("[Screen/VK]: Display returned no valid formats.\n");
                     }
                 }
             }
@@ -160,7 +224,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){
  * Initializes the gfx context
  */
 static void *qnx_gfx_ctx_vk_init(void *video_driver) {
-    RARCH_LOG("[Screen/VK]: Using Screen Driver!\n");
+    RARCH_LOG("qnx_gfx_ctx_vk_init\n"); //QNX DEBUG
 
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
     if(!qnx){
@@ -248,10 +312,12 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
 } /*qnx_gfx_ctx_vk_init*/
 
 static enum gfx_ctx_api qnx_gfx_ctx_vk_get_api(void *data){
+   RARCH_LOG("qnx_gfx_ctx_vk_get_api\n"); //QNX DEBUG
    return GFX_CTX_VULKAN_API;
 }
 
 static bool qnx_gfx_ctx_vk_bind_api(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor){
+   RARCH_LOG("qnx_gfx_ctx_vk_bind_api\n"); //QNX DEBUG
    return (api == GFX_CTX_VULKAN_API);
 }
 
@@ -259,16 +325,16 @@ static bool qnx_gfx_ctx_vk_bind_api(void *data, enum gfx_ctx_api api, unsigned m
  * TODO Comments
  */
 static bool qnx_gfx_ctx_vk_set_video_mode(void *data, unsigned width, unsigned height, bool fullscreen){
-    RARCH_LOG("[Screen/VK]: Setting video mode.\n");
+    RARCH_LOG("qnx_gfx_ctx_vk_set_video_mode\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Null Data Pointer.");
         return false;
     }
 
-    int size[2] = {0,0}, /*size_d[2],*/ swap_interval = 0/*, ndisplays*/; 
-    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
-        RARCH_ERR("[Screen/VK]: Failed to get screen sizes from window with errno %d.", errno);
+    int size[2] = {width,height}, /*size_d[2],*/ swap_interval = 0/*, ndisplays*/; 
+    if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+        RARCH_ERR("[Screen/VK]: Failed to set screen sizes from window with errno %d.", errno);
     if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
         RARCH_ERR("[Screen/VK]: Failed to get swap interval from window with errno %d.", errno);
 
@@ -277,11 +343,16 @@ static bool qnx_gfx_ctx_vk_set_video_mode(void *data, unsigned width, unsigned h
         return false;
     }
 
+    int form = SCREEN_FORMAT_RGB565;
+    if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_FORMAT,&form))
+        RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d.", errno);
+
+    get_display_info_qnx(qnx);
     return true;
 }
 
 static void qnx_gfx_ctx_vk_set_swap_interval(void *data, int swap_interval){
-    RARCH_LOG("[Screen/VK]: Setting swap interval...\n");
+    RARCH_LOG("qnx_gfx_ctx_vk_set_swap_interval\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Invalid Data passed to qnx_gfx_ctx_vk_set_swap_interval.\n");
@@ -293,6 +364,7 @@ static void qnx_gfx_ctx_vk_set_swap_interval(void *data, int swap_interval){
 }
 
 static void qnx_gfx_ctx_vk_get_video_size(void *data, unsigned *width, unsigned *height){
+    RARCH_LOG("qnx_gfx_ctx_vk_get_video_size\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Invalid data passed to qnx_gfx_ctx_vk_get_video_size\n");
@@ -310,18 +382,24 @@ static void qnx_gfx_ctx_vk_get_video_size(void *data, unsigned *width, unsigned 
 }
 
 static bool qnx_gfx_ctx_vk_has_focus(void *data){
+    RARCH_LOG("qnx_gfx_ctx_vk_has_focus\n"); //QNX DEBUG
     uint_t focused = 0;
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
     screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_FOCUS, &focused);
-    return (focused != 0)? true: false; /*I know this is unneeded, but bools can be strange*/
+    bool toret;
+    toret = (focused != 0)? true: false;
+
+    return toret; /*I know this is unneeded, but bools can be strange*/
 }
 
 static bool qnx_gfx_ctx_vk_suppress_screensaver(void *data, bool enable) { 
+    RARCH_LOG("qnx_gfx_ctx_vk_suppress_screensaver\n"); //QNX DEBUG
     return false; 
 }
 
 static void qnx_gfx_ctx_vk_check_window(void *data, bool *quit, bool *resize, unsigned *width, unsigned *height){
+    RARCH_LOG("qnx_gfx_ctx_vk_check_window\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     uint_t new_width, new_height, size[2];
     *quit=false; //TODO: CHECK VIA EVENTS
@@ -355,7 +433,7 @@ static int dpi_get_density(qnx_ctx_data_vk_t *qnx){
 
 
 static bool qnx_gfx_ctx_vk_get_metrics(void *data, enum display_metric_types type, float *value){
-    RARCH_LOG("[Screen/VK]: Get Metrics running.\n");
+    RARCH_LOG("qnx_gfx_ctx_vk_get_metrics\n"); //QNX DEBUG
     static int dpi = -1;
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
@@ -384,6 +462,7 @@ static bool qnx_gfx_ctx_vk_get_metrics(void *data, enum display_metric_types typ
 }
 
 static void qnx_gfx_ctx_vk_swap_buffers(void *data){
+    RARCH_LOG("qnx_gfx_ctx_vk_swap_buffers\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
     if(qnx->vk.context.flags & VK_CTX_FLAG_HAS_ACQUIRED_SWAPCHAIN){
@@ -397,29 +476,38 @@ static void qnx_gfx_ctx_vk_swap_buffers(void *data){
 }
 
 static void qnx_gfx_ctx_vk_input_driver (void *data, const char *joypad_name, input_driver_t **input, void **input_data){
+    RARCH_LOG("qnx_gfx_ctx_vk_input_driver\n"); //QNX DEBUG
     void *qnxinput  = input_driver_init_wrap(&input_qnx, joypad_name);
-   *input           = qnxinput ? &input_qnx : NULL;
-   *input_data      = qnxinput;
+    *input           = qnxinput ? &input_qnx : NULL;
+    *input_data      = qnxinput;
 }
 
-static uint32_t qnx_gfx_ctx_vk_get_flags(void *data)
-{
-   uint32_t flags = 0;
+static uint32_t qnx_gfx_ctx_vk_get_flags(void *data){
+    RARCH_LOG("qnx_gfx_ctx_vk_get_flags\n"); //QNX DEBUG
+    uint32_t flags = 0;
 
+#if defined(HAVE_SLANG) && defined(HAVE_SPIRV_CROSS)
    BIT32_SET(flags, GFX_CTX_FLAGS_SHADERS_SLANG);
+#endif
 
-   return flags;
+    return flags;
 }
 
-static void qnx_gfx_ctx_vk_set_flags(void *data, uint32_t flags) { }
-static void qnx_gfx_ctx_vk_bind_hw_render(void *data, bool enable){ }
+static void qnx_gfx_ctx_vk_set_flags(void *data, uint32_t flags){ 
+    RARCH_LOG("qnx_gfx_ctx_vk_set_flags\n"); //QNX DEBUG
+}
+static void qnx_gfx_ctx_vk_bind_hw_render(void *data, bool enable){
+    RARCH_LOG("qnx_gfx_ctx_vk_bind_hw_render\n"); //QNX DEBUG
+}
 
 static void* qnx_gfx_ctx_vk_get_context_data(void *data){
+    RARCH_LOG("qnx_gfx_ctx_vk_get_context_data\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     return &qnx->vk.context;
 }
 
 static bool qnx_gfx_ctx_vk_set_resize(void *data, unsigned width, unsigned height){
+    RARCH_LOG("qnx_gfx_ctx_vk_set_resize\n"); //QNX DEBUG
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*) data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Invalid data pointer passed to qnx_gfx_ctx_vk_set_resize\n");
@@ -433,7 +521,10 @@ static bool qnx_gfx_ctx_vk_set_resize(void *data, unsigned width, unsigned heigh
     return true;
 }
 
-static gfx_ctx_proc_t qnx_gfx_ctx_vk_get_proc_address(const char *symbol) { return NULL; }
+static gfx_ctx_proc_t qnx_gfx_ctx_vk_get_proc_address(const char *symbol){ 
+    RARCH_LOG("qnx_gfx_ctx_vk_get_proc_address\n"); //QNX DEBUG
+    return NULL; 
+}
 
 /*##############################################*/
 /*              Driver Structure                */

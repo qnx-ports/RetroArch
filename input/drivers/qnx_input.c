@@ -90,20 +90,26 @@ static void *qnx_input_init(const char *joypad_driver){
  * Polls for input from various devices and updates stored data about them.
  */
 static void qnx_input_poll( void *data){
+    printf("Polling function qnx\n");
     /*## Output ##*/
     qnx_input_t *qnx = (qnx_input_t*)data;
+    return; //TEMPORARY TO PREVENT POLLING LOOP AS INPUT IS BROKEN.
 
     /*## Request and process all screen events ##*/
     int val;
     screen_event_t screen_ev;
     screen_create_event(&screen_ev);
     
+    //INFINITELY LOOPING ATM
     while (true){
         /* Poll For new events */
+        printf("Polling function in while loop pre get_event\n");
         while (!screen_get_event(screen_ctx, screen_ev, ~0L)){
+            printf("Polling for input! errno %d\n", errno);
             screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_TYPE, &val);
             if (val == SCREEN_EVENT_NONE) break;
         }
+        printf("passed get_event\n");
         /* Process based on result */
         switch (val){
             /* Pass to Processing Functions */

@@ -1917,7 +1917,7 @@ bool task_push_start_dummy_core(content_ctx_info_t *content_info)
 #ifdef HAVE_PATCH
    uint16_t rarch_flags                       = retroarch_get_flags();
 #endif
-
+printf("###############DUMMYCOTR\n");
    if (!content_info)
       return false;
 
@@ -2478,7 +2478,7 @@ static bool task_load_content_internal(
       bool loading_from_companion_ui)
 {
    content_information_ctx_t content_ctx;
-
+printf("PEAR\n");
    content_state_t                 *p_content = content_state_get_ptr();
    bool ret                                   = false;
    runloop_state_t *runloop_st                = runloop_state_get_ptr();
@@ -2516,7 +2516,7 @@ static bool task_load_content_internal(
 
    content_ctx.subsystem.data                 = NULL;
    content_ctx.subsystem.size                 = 0;
-
+printf("APRICOT\n");
    if (sys_info)
    {
       struct retro_system_info *system        = &runloop_st->system.info;
@@ -2537,7 +2537,7 @@ static bool task_load_content_internal(
       content_ctx.subsystem.data              = sys_info->subsystem.data;
       content_ctx.subsystem.size              = sys_info->subsystem.size;
    }
-
+printf("AUBERGINE\n");
    if (!string_is_empty(runloop_st->name.ips))
       content_ctx.name_ips                 = strdup(runloop_st->name.ips);
    if (!string_is_empty(runloop_st->name.bps))
@@ -2550,10 +2550,10 @@ static bool task_load_content_internal(
 
    if (!content_info->environ_get)
       content_info->environ_get = menu_content_environment_get;
-
+printf("ORANGE\n");
    if (firmware_update_status(&content_ctx))
       goto end;
-
+printf("BANANA\n");
 #ifdef HAVE_PRESENCE
    {
       presence_userdata_t userdata;
@@ -2563,12 +2563,12 @@ static bool task_load_content_internal(
       command_event(CMD_EVENT_PRESENCE_UPDATE, &userdata);
    }
 #endif
-
+printf("APPLE\n");
    /* Loads content into currently selected core. */
    if ((ret = content_load(content_info, p_content)))
       task_push_to_history_list(p_content,
             true, loading_from_cli, loading_from_companion_ui);
-
+ printf("PEAR\n");
 end:
    if (content_ctx.name_ips)
       free(content_ctx.name_ips);
@@ -2582,7 +2582,7 @@ end:
       free(content_ctx.directory_cache);
    if (content_ctx.valid_extensions)
       free(content_ctx.valid_extensions);
-
+   printf("Yippee!\n");
    return ret;
 }
 
@@ -2591,6 +2591,7 @@ static bool task_load_content_internal_wrap(
       enum rarch_core_type type,
       bool load_from_companion_ui)
 {
+   printf("################ABVJH######################\n");
    /* Load content */
    if (!task_load_content_internal(content_info, true, false,
             load_from_companion_ui))
@@ -2600,9 +2601,11 @@ static bool task_load_content_internal_wrap(
    if (type != CORE_TYPE_DUMMY)
       menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUICK_MENU, NULL);
 #endif
+printf("Yahaha!\n");
    return true;
 
 error:
+printf("You found me!\n");
 #ifdef HAVE_MENU
    retroarch_menu_running();
 #endif
@@ -2659,6 +2662,7 @@ bool task_push_load_content_from_cli(
       retro_task_callback_t cb,
       void *user_data)
 {
+   printf("###########nkljuoilkj############\n");
    return task_load_content_internal(content_info, true, true, false);
 }
 
@@ -2674,7 +2678,6 @@ bool task_push_start_builtin_core(
    /* Preliminary stuff that has to be done before we
     * load the actual content. Can differ per mode. */
    runloop_set_current_core_type(type, true);
-
    return task_load_content_internal_wrap(content_info, type, false);
 }
 
@@ -2720,6 +2723,7 @@ bool task_push_load_subsystem_with_core(
       retro_task_callback_t cb,
       void *user_data)
 {
+   printf("########################load subsys with core\n");
    content_state_t  *p_content = content_state_get_ptr();
 
    p_content->flags |= CONTENT_ST_FLAG_PENDING_SUBSYSTEM_INIT;
