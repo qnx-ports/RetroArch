@@ -5219,7 +5219,6 @@ static enum runloop_state_enum runloop_check_state(
       settings_t *settings,
       retro_time_t current_time)
 {
-   printf("check_state\n");
    input_bits_t current_bits;
 #ifdef HAVE_MENU
    static input_bits_t last_input      = {{0}};
@@ -5248,9 +5247,8 @@ static enum runloop_state_enum runloop_check_state(
    bool menu_is_alive                  = menu_st->flags & MENU_ST_FLAG_ALIVE;
    bool display_kb                     = menu_input_dialog_get_display_kb();
 #endif
-   printf("pregfx\n");
+
 #if defined(HAVE_GFX_WIDGETS)
-   printf("gfx\n");
    dispgfx_widget_t *p_dispwidget      = dispwidget_get_ptr();
    bool widgets_active                 = p_dispwidget->active;
 #endif
@@ -5277,7 +5275,7 @@ static enum runloop_state_enum runloop_check_state(
    if (!aptMainLoop())
       return RUNLOOP_STATE_QUIT;
 #endif
-printf("A\n");
+
    BIT256_CLEAR_ALL_PTR(&current_bits);
 
    input_st->flags    &= ~(INP_FLAG_BLOCK_LIBRETRO_INPUT 
@@ -5328,7 +5326,7 @@ printf("A\n");
       }
    }
 #endif
-printf("B\n");
+
    if (!VIDEO_DRIVER_IS_THREADED_INTERNAL(video_st))
    {
       const ui_application_t *application = uico_st->drv
@@ -5348,7 +5346,7 @@ printf("B\n");
    if (menu_driver_binding_state)
       BIT256_CLEAR_ALL(current_bits);
 #endif
-printf("C\n");
+
    /* Check fullscreen hotkey */
    HOTKEY_CHECK(RARCH_FULLSCREEN_TOGGLE_KEY, CMD_EVENT_FULLSCREEN_TOGGLE, true, NULL);
 
@@ -5431,7 +5429,7 @@ printf("C\n");
       HOTKEY_CHECK(RARCH_OSK, CMD_EVENT_OSK_TOGGLE, true, NULL);
    }
 #endif
-printf("D\n");
+
    /*
    * If the Aspect Ratio is FULL then update the aspect ratio to the 
    * current video driver aspect ratio (The full window)
@@ -5459,7 +5457,7 @@ printf("D\n");
          last_height = video_driver_height;
       }
    }
-printf("E\n");
+
    /* Check quit hotkey */
    {
       bool trig_quit_key, quit_press_twice;
@@ -5501,7 +5499,7 @@ printf("E\n");
                   MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
          }
       }
-printf("F\n");
+
       if (RUNLOOP_TIME_TO_EXIT(trig_quit_key))
       {
          bool quit_runloop           = false;
@@ -5576,7 +5574,7 @@ printf("F\n");
          }
       }
    }
-   printf("H\n");
+
 
 #if defined(HAVE_MENU) || defined(HAVE_GFX_WIDGETS)
    gfx_animation_update(
@@ -5585,10 +5583,10 @@ printf("F\n");
          settings->floats.menu_ticker_speed,
          video_st->width,
          video_st->height);
-         printf("H.1\n");
+
 
 #if defined(HAVE_GFX_WIDGETS)
-printf("H.21\n");
+
    if (widgets_active)
    {
       bool rarch_force_fullscreen = video_st->flags &
@@ -5608,14 +5606,12 @@ printf("H.21\n");
             VIDEO_DRIVER_IS_THREADED_INTERNAL(video_st));
       RUNLOOP_MSG_QUEUE_UNLOCK(runloop_st);
    }
-   printf("H.22\n");
 #endif
 
 #ifdef HAVE_MENU
-printf("H.31\n");
    if (menu_is_alive)
    {
-      printf("Apple\n");
+
       enum menu_action action;
       static input_bits_t old_input = {{0}};
       static enum menu_action
@@ -5624,12 +5620,12 @@ printf("H.31\n");
       bool focused                  = false;
       input_bits_t trigger_input    = current_bits;
       unsigned screensaver_timeout  = settings->uints.menu_screensaver_timeout;
-      printf("Apple_2\n");
+
       /* Get current time */
       menu_st->current_time_us      = current_time;
-      printf("Apple_3\n");
+
       cbs->poll_cb();
-      printf("Banana\n");
+
       bits_clear_bits(trigger_input.data, old_input.data,
             ARRAY_SIZE(trigger_input.data));
       action                    = (enum menu_action)menu_event(
@@ -5646,7 +5642,7 @@ printf("H.31\n");
          else
             focused = (!(uico_st->flags & UICO_ST_FLAG_IS_ON_FOREGROUND));
       }
-      printf("Cucumber\n");
+
       if (action == old_action)
       {
          retro_time_t press_time          = current_time;
@@ -5684,7 +5680,7 @@ printf("H.31\n");
             }
          }
       }
-      printf("Durian\n");
+
       /* Check whether menu screensaver should be enabled */
       if (     (screensaver_timeout > 0)
             && (menu_st->flags & MENU_ST_FLAG_SCREENSAVER_SUPPORTED)
@@ -5700,7 +5696,7 @@ printf("H.31\n");
       }
 
       /* Iterate the menu driver for one frame. */
-      printf("Eggplant\n");
+
       /* If the user had requested that the Quick Menu
        * be spawned during the previous frame, do this now
        * and exit the function to go to the next frame. */
@@ -5738,7 +5734,7 @@ printf("H.31\n");
          else
             retroarch_menu_running_finished(false);
       }
-      printf("Fig\n");
+
       if (focused || !(runloop_st->flags & RUNLOOP_FLAG_IDLE))
       {
          bool runloop_is_inited      = runloop_st->flags & RUNLOOP_FLAG_IS_INITED;
@@ -5805,26 +5801,25 @@ printf("H.31\n");
                !libretro_running)
             audio_driver_menu_sample();
       }
-      printf("Grapes\n");
+
       old_input                 = current_bits;
       old_action                = action;
 
       if (!focused || (runloop_st->flags & RUNLOOP_FLAG_IDLE))
          return RUNLOOP_STATE_POLLED_AND_SLEEP;
-      printf("Hydrapple\n");
+
    }
    else
 #endif
 #endif
    {
-      printf("I\n");
       if (runloop_st->flags & RUNLOOP_FLAG_IDLE)
       {
          cbs->poll_cb();
          return RUNLOOP_STATE_POLLED_AND_SLEEP;
       }
    }
-   printf("H.32\n");
+
 
    /* Check Game Focus hotkey */
    {
@@ -5837,7 +5832,7 @@ printf("H.31\n");
 
    /* Check close content hotkey */
    HOTKEY_CHECK(RARCH_CLOSE_CONTENT_KEY, CMD_EVENT_CLOSE_CONTENT, true, NULL);
-printf("J\n");
+
 #ifdef HAVE_MENU
    /* Check menu hotkey */
    {
@@ -6657,7 +6652,6 @@ int runloop_iterate(void)
 #endif
    }
 #endif
-   printf("Bisector 1\n");
    if (runloop_st->frame_time.callback)
    {
       /* Updates frame timing if frame timing callback is in use by the core.
@@ -6685,12 +6679,11 @@ int runloop_iterate(void)
       if (!core_paused)
          runloop_st->frame_time.callback(delta);
    }
-   printf("Bisector 2\n");
+
    /* Update audio buffer occupancy if buffer status
     * callback is in use by the core */
    if (runloop_st->audio_buffer_status.callback)
    {
-      printf("Audio\n");
       bool audio_buf_active        = false;
       unsigned audio_buf_occupancy = 0;
       bool audio_buf_underrun      = false;
@@ -6726,20 +6719,17 @@ int runloop_iterate(void)
          runloop_st->audio_buffer_status.callback(
                audio_buf_active, audio_buf_occupancy, audio_buf_underrun);
    }
-   printf("Bisector 3\n");
 
    switch ((enum runloop_state_enum)runloop_check_state(
             global_get_ptr()->error_on_init,
             settings, current_time))
    {
       case RUNLOOP_STATE_QUIT:
-      printf("quit\n");
          runloop_st->frame_limit_last_time = 0.0;
          runloop_st->flags                &= ~RUNLOOP_FLAG_CORE_RUNNING;
          command_event(CMD_EVENT_QUIT, NULL);
          return -1;
       case RUNLOOP_STATE_POLLED_AND_SLEEP:
-      printf("polling\n");
 #ifdef HAVE_NETWORKING
          /* FIXME: This is an ugly way to tell Netplay this... */
          netplay_driver_ctl(RARCH_NETPLAY_CTL_PAUSE, NULL);
@@ -6750,7 +6740,6 @@ int runloop_iterate(void)
             retro_sleep(10);
          return 1;
       case RUNLOOP_STATE_PAUSE:
-      printf("pause\n");
 #ifdef HAVE_NETWORKING
          /* FIXME: This is an ugly way to tell Netplay this... */
          netplay_driver_ctl(RARCH_NETPLAY_CTL_PAUSE, NULL);
@@ -6758,7 +6747,6 @@ int runloop_iterate(void)
          video_driver_cached_frame();
          return 1;
       case RUNLOOP_STATE_END:
-      printf("end\n");
 #ifdef HAVE_NETWORKING
 #ifdef HAVE_MENU
          /* FIXME: This is an ugly way to tell Netplay this... */
@@ -6770,18 +6758,16 @@ int runloop_iterate(void)
 #endif
          goto end;
       case RUNLOOP_STATE_MENU_ITERATE:
-      printf("menu iterate\n");
 #ifdef HAVE_NETWORKING
          /* FIXME: This is an ugly way to tell Netplay this... */
          netplay_driver_ctl(RARCH_NETPLAY_CTL_PAUSE, NULL);
 #endif
          return 0;
       case RUNLOOP_STATE_ITERATE:
-      printf("state iterate\n");
          runloop_st->flags       |= RUNLOOP_FLAG_CORE_RUNNING;
          break;
    }
-   printf("postswitch\n");
+
 
 #ifdef HAVE_THREADS
    if (runloop_st->flags & RUNLOOP_FLAG_AUTOSAVE)
@@ -7039,7 +7025,6 @@ int runloop_iterate(void)
 #endif
 
 end:
-printf("at end of run_loop\n");
    if (vrr_runloop_enable)
    {
       /* Sync on video only, block audio later. */

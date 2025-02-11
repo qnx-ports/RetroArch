@@ -24,8 +24,7 @@
 #include "qnx_input.h"
 
 /*### Globals ###*/
-extern screen_context_t screen_ctx;
-
+#include "../../qnx/qnx_common_ctx.h"
 
 /*##############################################*/
 /*                   Functions                  */
@@ -90,26 +89,40 @@ static void *qnx_input_init(const char *joypad_driver){
  * Polls for input from various devices and updates stored data about them.
  */
 static void qnx_input_poll( void *data){
-    printf("Polling function qnx\n");
     /*## Output ##*/
     qnx_input_t *qnx = (qnx_input_t*)data;
-    return; //TEMPORARY TO PREVENT POLLING LOOP AS INPUT IS BROKEN.
+    //return; //TEMPORARY TO PREVENT POLLING LOOP AS INPUT IS BROKEN.
+    
+    if(!(*screen_ctx_qnx)){
+        RARCH_LOG("[Screen/In]: Invalid Context\n");
+        return;
+    }
 
     /*## Request and process all screen events ##*/
-    int val;
+#define DUMMY_VALUE_EVENT -17 //DUMMY VALUE, NOT PART OF SCREEN
+    int val = DUMMY_VALUE_EVENT; //Stores type of event
     screen_event_t screen_ev;
     screen_create_event(&screen_ev);
     
     //INFINITELY LOOPING ATM
     while (true){
         /* Poll For new events */
-        printf("Polling function in while loop pre get_event\n");
-        while (!screen_get_event(screen_ctx, screen_ev, ~0L)){
-            printf("Polling for input! errno %d\n", errno);
+        while (screen_get_event(*screen_ctx_qnx, screen_ev, 0)!=0){
+            //0 is successful - thus any non zero goes here.
+            RARCH_LOG("[Screen/In]: Failed to get event with. errno %d\n", errno);
+            if(errno == 22) return;
             screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_TYPE, &val);
             if (val == SCREEN_EVENT_NONE) break;
         }
-        printf("passed get_event\n");
+
+        screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_TYPE, &val);
+
+        if(val == SCREEN_EVENT_NONE) break;
+        if(val == DUMMY_VALUE_EVENT){
+            RARCH_ERR("[Screen/In]: No event type passed in.\n");
+            break;
+        }
+
         /* Process based on result */
         switch (val){
             /* Pass to Processing Functions */
@@ -471,7 +484,7 @@ static int qnx_discover_controllers(qnx_input_t *qnx){
     /* Get array of connected devices */
     int deviceCount = 0, ret;
     unsigned i;
-    ret = screen_get_context_property_iv(screen_ctx, SCREEN_PROPERTY_DEVICE_COUNT, &deviceCount);
+    ret = screen_get_context_property_iv(*screen_ctx_qnx, SCREEN_PROPERTY_DEVICE_COUNT, &deviceCount);
 
     /* Failed Query Error */
     if (ret < 0){ 
@@ -487,7 +500,7 @@ static int qnx_discover_controllers(qnx_input_t *qnx){
         return false;
     }
 
-    ret = screen_get_context_property_pv(screen_ctx, SCREEN_PROPERTY_DEVICES, (void**)devices_found);
+    ret = screen_get_context_property_pv(*screen_ctx_qnx, SCREEN_PROPERTY_DEVICES, (void**)devices_found);
 
     /* Failed Query Error */
     if (ret < 0){ 

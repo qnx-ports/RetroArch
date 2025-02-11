@@ -30,6 +30,9 @@
 #include <screen/screen.h>
 #include <sys/platform.h>
 #include <errno.h>
+#include "../../qnx/qnx_common_ctx.h"
+screen_context_t* screen_ctx_qnx = NULL;
+screen_window_t* screen_win_qnx = NULL;
 
 /*### Retro Arch ###*/
 #include "../../config.h"
@@ -43,6 +46,8 @@
 
 /*### Vulkan ###*/
 #include "../common/vulkan_common.h"
+
+#define QNX_FORMAT SCREEN_FORMAT_RGBX8888 //QNX DEBUG
 
 /*##############################################*/
 /*                  Structures                  */
@@ -65,7 +70,7 @@ typedef struct {
  * Destroys the gfx context
  */
 static void qnx_gfx_ctx_vk_destroy(void *data){
-    RARCH_LOG("qnx_gfx_ctx_vk_destroy\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
     if(!qnx) return;
@@ -75,14 +80,12 @@ static void qnx_gfx_ctx_vk_destroy(void *data){
         slock_free(qnx->vk.context.queue_lock);
     screen_destroy_window(qnx->win);
     screen_destroy_context(qnx->ctx);
-    free(qnx->win);
-    free(qnx->ctx);
     free(data);
 
 } /*qnx_gfx_ctx_vk_destroy*/
 
 static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){  
-    char * buf = malloc(64*sizeof(char));
+    char * buf = calloc(64, sizeof(char));
     int buf_i = -1;
     if(!buf){
         RARCH_LOG("[Screen/VK]: Failed to allocate memory for display qnx info.\n");
@@ -93,6 +96,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){
     RARCH_LOG("=============================\n");
     RARCH_LOG("QNX Display, Ctx, Window Info\n");
     RARCH_LOG("=============================\n");
+    RARCH_LOG("[Screen/VK]: Addresses: ctx %u win %u", qnx->ctx, qnx->win);
 
     if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_ID_STRING, len, buf))
         RARCH_LOG("[Screen/VK]: Failed to query context for id_str with errno %d.\n", errno);
@@ -224,7 +228,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){
  * Initializes the gfx context
  */
 static void *qnx_gfx_ctx_vk_init(void *video_driver) {
-    RARCH_LOG("qnx_gfx_ctx_vk_init\n"); //QNX DEBUG
+
 
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
     if(!qnx){
@@ -258,6 +262,10 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
     int usage = SCREEN_USAGE_VULKAN;
     if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_USAGE, &usage))
         RARCH_WARN("[Screen/VK]: Could not set window type to SCREEN_USAGE VULKAN, errno %d.\n", errno);
+    
+    int form = QNX_FORMAT;
+    if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_FORMAT,&form))
+        RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d.\n", errno);
 
     RARCH_LOG("[Screen/VK]: Context, Window initialized.\n");
 
@@ -284,6 +292,8 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
 
     qnx->ctx  = *screen_ctx;
     qnx->win  = *screen_win;
+    screen_ctx_qnx= &(qnx->ctx);
+    screen_win_qnx= &(qnx->win);
 
     int size[2] = {0,0};
     RARCH_LOG("[Screen/VK]: Getting screen size...\n");
@@ -312,12 +322,12 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
 } /*qnx_gfx_ctx_vk_init*/
 
 static enum gfx_ctx_api qnx_gfx_ctx_vk_get_api(void *data){
-   RARCH_LOG("qnx_gfx_ctx_vk_get_api\n"); //QNX DEBUG
+
    return GFX_CTX_VULKAN_API;
 }
 
 static bool qnx_gfx_ctx_vk_bind_api(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor){
-   RARCH_LOG("qnx_gfx_ctx_vk_bind_api\n"); //QNX DEBUG
+
    return (api == GFX_CTX_VULKAN_API);
 }
 
@@ -325,7 +335,7 @@ static bool qnx_gfx_ctx_vk_bind_api(void *data, enum gfx_ctx_api api, unsigned m
  * TODO Comments
  */
 static bool qnx_gfx_ctx_vk_set_video_mode(void *data, unsigned width, unsigned height, bool fullscreen){
-    RARCH_LOG("qnx_gfx_ctx_vk_set_video_mode\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Null Data Pointer.");
@@ -343,16 +353,16 @@ static bool qnx_gfx_ctx_vk_set_video_mode(void *data, unsigned width, unsigned h
         return false;
     }
 
-    int form = SCREEN_FORMAT_RGB565;
+    int form = QNX_FORMAT; 
     if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_FORMAT,&form))
-        RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d.", errno);
+        RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d.\n", errno);
 
     get_display_info_qnx(qnx);
     return true;
 }
 
 static void qnx_gfx_ctx_vk_set_swap_interval(void *data, int swap_interval){
-    RARCH_LOG("qnx_gfx_ctx_vk_set_swap_interval\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Invalid Data passed to qnx_gfx_ctx_vk_set_swap_interval.\n");
@@ -364,7 +374,7 @@ static void qnx_gfx_ctx_vk_set_swap_interval(void *data, int swap_interval){
 }
 
 static void qnx_gfx_ctx_vk_get_video_size(void *data, unsigned *width, unsigned *height){
-    RARCH_LOG("qnx_gfx_ctx_vk_get_video_size\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Invalid data passed to qnx_gfx_ctx_vk_get_video_size\n");
@@ -382,7 +392,7 @@ static void qnx_gfx_ctx_vk_get_video_size(void *data, unsigned *width, unsigned 
 }
 
 static bool qnx_gfx_ctx_vk_has_focus(void *data){
-    RARCH_LOG("qnx_gfx_ctx_vk_has_focus\n"); //QNX DEBUG
+
     uint_t focused = 0;
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
@@ -394,12 +404,12 @@ static bool qnx_gfx_ctx_vk_has_focus(void *data){
 }
 
 static bool qnx_gfx_ctx_vk_suppress_screensaver(void *data, bool enable) { 
-    RARCH_LOG("qnx_gfx_ctx_vk_suppress_screensaver\n"); //QNX DEBUG
+
     return false; 
 }
 
 static void qnx_gfx_ctx_vk_check_window(void *data, bool *quit, bool *resize, unsigned *width, unsigned *height){
-    RARCH_LOG("qnx_gfx_ctx_vk_check_window\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     uint_t new_width, new_height, size[2];
     *quit=false; //TODO: CHECK VIA EVENTS
@@ -433,7 +443,7 @@ static int dpi_get_density(qnx_ctx_data_vk_t *qnx){
 
 
 static bool qnx_gfx_ctx_vk_get_metrics(void *data, enum display_metric_types type, float *value){
-    RARCH_LOG("qnx_gfx_ctx_vk_get_metrics\n"); //QNX DEBUG
+
     static int dpi = -1;
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
@@ -462,7 +472,7 @@ static bool qnx_gfx_ctx_vk_get_metrics(void *data, enum display_metric_types typ
 }
 
 static void qnx_gfx_ctx_vk_swap_buffers(void *data){
-    RARCH_LOG("qnx_gfx_ctx_vk_swap_buffers\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
     if(qnx->vk.context.flags & VK_CTX_FLAG_HAS_ACQUIRED_SWAPCHAIN){
@@ -476,14 +486,14 @@ static void qnx_gfx_ctx_vk_swap_buffers(void *data){
 }
 
 static void qnx_gfx_ctx_vk_input_driver (void *data, const char *joypad_name, input_driver_t **input, void **input_data){
-    RARCH_LOG("qnx_gfx_ctx_vk_input_driver\n"); //QNX DEBUG
+
     void *qnxinput  = input_driver_init_wrap(&input_qnx, joypad_name);
     *input           = qnxinput ? &input_qnx : NULL;
     *input_data      = qnxinput;
 }
 
 static uint32_t qnx_gfx_ctx_vk_get_flags(void *data){
-    RARCH_LOG("qnx_gfx_ctx_vk_get_flags\n"); //QNX DEBUG
+
     uint32_t flags = 0;
 
 #if defined(HAVE_SLANG) && defined(HAVE_SPIRV_CROSS)
@@ -494,20 +504,20 @@ static uint32_t qnx_gfx_ctx_vk_get_flags(void *data){
 }
 
 static void qnx_gfx_ctx_vk_set_flags(void *data, uint32_t flags){ 
-    RARCH_LOG("qnx_gfx_ctx_vk_set_flags\n"); //QNX DEBUG
+
 }
 static void qnx_gfx_ctx_vk_bind_hw_render(void *data, bool enable){
-    RARCH_LOG("qnx_gfx_ctx_vk_bind_hw_render\n"); //QNX DEBUG
+
 }
 
 static void* qnx_gfx_ctx_vk_get_context_data(void *data){
-    RARCH_LOG("qnx_gfx_ctx_vk_get_context_data\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
     return &qnx->vk.context;
 }
 
 static bool qnx_gfx_ctx_vk_set_resize(void *data, unsigned width, unsigned height){
-    RARCH_LOG("qnx_gfx_ctx_vk_set_resize\n"); //QNX DEBUG
+
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*) data;
     if(!qnx){
         RARCH_ERR("[Screen/VK]: Invalid data pointer passed to qnx_gfx_ctx_vk_set_resize\n");
@@ -522,7 +532,7 @@ static bool qnx_gfx_ctx_vk_set_resize(void *data, unsigned width, unsigned heigh
 }
 
 static gfx_ctx_proc_t qnx_gfx_ctx_vk_get_proc_address(const char *symbol){ 
-    RARCH_LOG("qnx_gfx_ctx_vk_get_proc_address\n"); //QNX DEBUG
+
     return NULL; 
 }
 

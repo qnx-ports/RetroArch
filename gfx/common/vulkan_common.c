@@ -3258,7 +3258,8 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
    if (old_swapchain != VK_NULL_HANDLE)
       vkDestroySwapchainKHR(vk->context.device, old_swapchain, NULL);
 #endif
-
+   info.imageFormat =VK_FORMAT_B8G8R8A8_UNORM; //QNX DEBUG
+   RARCH_LOG("[Vulkan/Debug] Format: %d.", info.imageFormat);
    if (vkCreateSwapchainKHR(vk->context.device,
             &info, NULL, &vk->swapchain) != VK_SUCCESS)
    {

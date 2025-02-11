@@ -4664,7 +4664,6 @@ int rarch_main(int argc, char *argv[], void *data)
       info.args            = data;
       info.environ_get     = frontend_state_get_ptr()->current_frontend_ctx->environment_get;
 
-      printf("MAIN LOOPER A\n");
       if (!task_push_load_content_from_cli(
                NULL,
                NULL,
@@ -4673,49 +4672,38 @@ int rarch_main(int argc, char *argv[], void *data)
                NULL,
                NULL))
          return 1;
-         printf("MAIN LOOPER B\n");
    }
 
    ui_companion_driver_init_first();
-   printf("MAIN LOOPER C\n");
+
 #if !defined(HAVE_MAIN) || defined(HAVE_QT)
    for (;;)
    {
-      printf("MAIN LOOPER D - IN INF FOR LOOP\n");
       int ret;
       bool app_exit     = false;
 #ifdef HAVE_QT
       ui_companion_qt.application->process_events();
 #endif
       ret = runloop_iterate();
-   printf("MAIN LOOPER E - IN INF FOR LOOP\n");
       task_queue_check();
 
 #ifdef HAVE_MIST
-   printf("MAIN LOOPER E.1 - IN INF FOR LOOP\n");
    steam_poll();
-   printf("MAIN LOOPER E.2 - IN INF FOR LOOP\n");
 #endif
 
 #ifdef HAVE_QT
-   printf("MAIN LOOPER E.3 - IN INF FOR LOOP\n");
       app_exit = ui_companion_qt.application->exiting;
-      printf("MAIN LOOPER E.4 - IN INF FOR LOOP\n");
 #endif
-   printf("MAIN LOOPER F - IN INF FOR LOOP\n");
       if (ret == -1 || app_exit)
       {
-         printf("MAIN LOOPER G - EXITING\n");
 #ifdef HAVE_QT
          ui_companion_qt.application->quit();
 #endif
          break;
       }
    }
-   printf("MAIN LOOPER H - EXITING\n");
    main_exit(data);
 #endif
-printf("MAIN LOOPER EXITING\n");
 
    return 0;
 }
