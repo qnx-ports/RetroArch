@@ -1510,13 +1510,14 @@ static void *vulkan_init(const video_info_t *video,
       vk->flags         &= ~VK_FLAG_FULLSCREEN;
    vk->tex_w             = RARCH_SCALE_BASE * video->input_scale;
    vk->tex_h             = RARCH_SCALE_BASE * video->input_scale;
-   vk->tex_fmt           = /*video->rgb32 ?*/ VK_FORMAT_B8G8R8A8_UNORM /*: VK_FORMAT_R5G6B5_UNORM_PACK16*/; //QNX DEBUG
+   vk->tex_fmt           = video->rgb32 ? VK_FORMAT_B8G8R8A8_UNORM : VK_FORMAT_R5G6B5_UNORM_PACK16; 
    if (video->force_aspect)
       vk->flags         |=  VK_FLAG_KEEP_ASPECT;
    else
       vk->flags         &= ~VK_FLAG_KEEP_ASPECT;
-   RARCH_LOG("[Vulkan]: Using %s format.\n", video->rgb32 ? "BGRA8888" : "RGB565");
-
+   RARCH_LOG("[Vulkan]: Using %s format.\n", vk->tex_fmt==VK_FORMAT_B8G8R8A8_UNORM ? "BGRA8888" : "RGB565");
+   RARCH_LOG("[QNX DEBUG]: rgb32 status: %u scale: %u.\n", video->rgb32, video->input_scale);
+   RARCH_LOG("[QNX DEBUG]: W/H of req box: %dx%d\n", temp_width, temp_height);
    /* Set the viewport to fix recording, since it needs to know
     * the viewport sizes before we start running. */
    vulkan_set_viewport(vk, temp_width, temp_height, false, true);
@@ -3184,6 +3185,9 @@ static void vulkan_set_texture_frame(void *data,
       const void *frame, bool rgb32, unsigned width, unsigned height,
       float alpha)
 {
+   //QNX DEBUG
+   rgb32=true;
+
    size_t y;
    unsigned stride;
    uint8_t *ptr                        = NULL;
@@ -3209,12 +3213,13 @@ static void vulkan_set_texture_frame(void *data,
    if (!rgb32)
    {
        VkFormatProperties formatProperties;
-       vkGetPhysicalDeviceFormatProperties(vk->context->gpu, VK_FORMAT_B4G4R4A4_UNORM_PACK16, &formatProperties);
+       vkGetPhysicalDeviceFormatProperties(vk->context->gpu, VK_FORMAT_B4G4R4A4_UNORM_PACK16 /*VK_FORMAT_R5G6B5_UNORM_PACK16*/, &formatProperties); //QNX DEBUG
        if (formatProperties.optimalTilingFeatures != 0)
        {
            /* B4G4R4A4 must be supported, but R4G4B4A4 is optional,
             * just apply the swizzle in the image view instead. */
-           fmt         = VK_FORMAT_B4G4R4A4_UNORM_PACK16;
+           fmt         = VK_FORMAT_B4G4R4A4_UNORM_PACK16;/* VK_FORMAT_R5G6B5_UNORM_PACK16;*/
+           RARCH_LOG("[QNX_DEBUG]: switch to B4G4R4A4\n");
            ptr_swizzle = &br_swizzle;
        }
        else

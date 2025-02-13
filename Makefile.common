@@ -195,6 +195,7 @@ ifneq ($(findstring qnx,$(OS)),)
           frontend/drivers/platform_qnx.o
    HAVE_UNIX = 1
    NEED_CXX_LINKER = 1
+   DEFINES += -DHAVE_VIDEO_FILTER
 endif
 
 ifeq ($(HAVE_UNIX), 1)

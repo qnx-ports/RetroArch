@@ -155,7 +155,7 @@ void libretro_dummy_retro_get_system_av_info(
 
 void libretro_dummy_retro_set_environment(retro_environment_t cb)
 {
-   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
+   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;//QNX DEBUG USED TO BE RGB565
 
    dummy_environ_cb = cb;
 

@@ -943,9 +943,10 @@ else ifeq (qnx,$(platform))
    HAVE_PATCH               := 1
    HAVE_CHEATS              := 1
    HAVE_CORE_INFO_CACHE     := 1
+   HAVE_RGUI                := 1
 
-   CC=qcc -Vgcc_ntoarmv7le
-   CXX=QCC -Vgcc_ntoarmv7le
+   CC=qcc -Vgcc_ntoaarch64le
+   CXX=QCC -Vgcc_ntoaarch64le
 
    ifeq ($(DEBUG), 1)
       LDFLAGS += -g

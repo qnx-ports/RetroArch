@@ -96,7 +96,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){
     RARCH_LOG("=============================\n");
     RARCH_LOG("QNX Display, Ctx, Window Info\n");
     RARCH_LOG("=============================\n");
-    RARCH_LOG("[Screen/VK]: Addresses: ctx %u win %u", qnx->ctx, qnx->win);
+    RARCH_LOG("[Screen/VK]: Addresses: ctx %u win %u\n", qnx->ctx, qnx->win);
 
     if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_ID_STRING, len, buf))
         RARCH_LOG("[Screen/VK]: Failed to query context for id_str with errno %d.\n", errno);
@@ -251,7 +251,7 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
         return false;
     }
     
-    if(screen_create_window_type(screen_win, *screen_ctx, SCREEN_APPLICATION_WINDOW)){
+    if(screen_create_window(screen_win, *screen_ctx)){
         RARCH_ERR("[Screen/VK]: Fatal: Window init failed with errno %d.\n", errno);
         screen_destroy_context(*screen_ctx);
         free(screen_ctx);
@@ -263,11 +263,11 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
     if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_USAGE, &usage))
         RARCH_WARN("[Screen/VK]: Could not set window type to SCREEN_USAGE VULKAN, errno %d.\n", errno);
     
-    int form = QNX_FORMAT;
-    if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_FORMAT,&form))
-        RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d.\n", errno);
-
-    RARCH_LOG("[Screen/VK]: Context, Window initialized.\n");
+    // int form = QNX_FORMAT;
+    // if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_FORMAT,&form))
+    //     RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d.\n", errno);
+    
+    // RARCH_LOG("[Screen/VK]: Context, Window initialized.\n");
 
     /*
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
@@ -295,7 +295,7 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
     screen_ctx_qnx= &(qnx->ctx);
     screen_win_qnx= &(qnx->win);
 
-    int size[2] = {0,0};
+    int size[2] = {0,0}, swap_interval = 60;
     RARCH_LOG("[Screen/VK]: Getting screen size...\n");
     if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
         RARCH_ERR("[Screen/VK]: Failed to get screen size with errno %d.\n", errno);
@@ -303,6 +303,9 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
         RARCH_LOG("[Screen/VK]: Screen Size: %d x %d \n", size[0], size[1]);
 
     get_display_info_qnx(qnx);
+
+    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
+        RARCH_ERR("[Screen/VK]: Failed to get screen size with errno %d.\n", errno);
     
     if(min(size[0], size[1]) < 0 || min(size[0], size[1]) > 100000){
         RARCH_LOG("[Screen/VK]: Window size invalid! Setting to 1920x1080\n");
@@ -314,6 +317,7 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
 
     qnx->width  = size[0];
     qnx->height = size[1];
+    qnx->swap_interval = swap_interval;
 
     free(screen_win);
     free(screen_ctx);
@@ -327,7 +331,7 @@ static enum gfx_ctx_api qnx_gfx_ctx_vk_get_api(void *data){
 }
 
 static bool qnx_gfx_ctx_vk_bind_api(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor){
-
+   RARCH_LOG("[Screen/Vk]: Asking for %d API (9=VULKAN) Version %d.%d.\n", api, major, minor);
    return (api == GFX_CTX_VULKAN_API);
 }
 
@@ -341,21 +345,17 @@ static bool qnx_gfx_ctx_vk_set_video_mode(void *data, unsigned width, unsigned h
         RARCH_ERR("[Screen/VK]: Null Data Pointer.");
         return false;
     }
+    qnx->width = width;
+    qnx->height = height;
 
-    int size[2] = {width,height}, /*size_d[2],*/ swap_interval = 0/*, ndisplays*/; 
-    if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
-        RARCH_ERR("[Screen/VK]: Failed to set screen sizes from window with errno %d.", errno);
-    if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
-        RARCH_ERR("[Screen/VK]: Failed to get swap interval from window with errno %d.", errno);
-
-    if(!vulkan_surface_create(&qnx->vk, VULKAN_WSI_QNX, &qnx->ctx, &qnx->win, size[0], size[1], swap_interval)){ 
+    int size[2] = {width,height}; 
+    //if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+    //     RARCH_ERR("[Screen/VK]: Failed to set screen sizes from window with errno %d.", errno);
+    
+    if(!vulkan_surface_create(&qnx->vk, VULKAN_WSI_QNX, &qnx->ctx, &qnx->win, size[0], size[1], qnx->swap_interval)){ 
         RARCH_ERR("[Screen/VK]: Failed to create surface.\n");
         return false;
     }
-
-    int form = QNX_FORMAT; 
-    if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_FORMAT,&form))
-        RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d.\n", errno);
 
     get_display_info_qnx(qnx);
     return true;
@@ -368,9 +368,11 @@ static void qnx_gfx_ctx_vk_set_swap_interval(void *data, int swap_interval){
         RARCH_ERR("[Screen/VK]: Invalid Data passed to qnx_gfx_ctx_vk_set_swap_interval.\n");
         return;
     }
+    qnx->swap_interval = swap_interval;
 
     if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
         RARCH_ERR("[Screen/VK]: Setting swap interval of window failed with errno %d.\n", errno);
+    else RARCH_LOG("Setting Swap Interval to %d.\n", swap_interval);
 }
 
 static void qnx_gfx_ctx_vk_get_video_size(void *data, unsigned *width, unsigned *height){
@@ -389,6 +391,8 @@ static void qnx_gfx_ctx_vk_get_video_size(void *data, unsigned *width, unsigned 
     }
     *width = (unsigned) size[0];
     *height = (unsigned) size[1];
+    qnx->width = width;
+    qnx->height = height;
 }
 
 static bool qnx_gfx_ctx_vk_has_focus(void *data){
@@ -411,17 +415,18 @@ static bool qnx_gfx_ctx_vk_suppress_screensaver(void *data, bool enable) {
 static void qnx_gfx_ctx_vk_check_window(void *data, bool *quit, bool *resize, unsigned *width, unsigned *height){
 
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
-    uint_t new_width, new_height, size[2];
+    uint_t size[2];
     *quit=false; //TODO: CHECK VIA EVENTS
 
-    screen_get_window_property_iv(qnx->ctx, SCREEN_PROPERTY_SIZE, &size);
+    if(!screen_get_window_property_iv(qnx->ctx, SCREEN_PROPERTY_SIZE, &size))
+        RARCH_LOG("[Screen/Vk]: Failed to get window size in check_window\n");
 
-    if(new_width!=qnx->width || new_height!=qnx->height){
-        *width=new_width;
-        *height=new_height;
+    if(size[0]!=qnx->width || size[1]!=qnx->height){
+        *width=size[0];
+        *height=size[1];
         *resize=true;
-        qnx->width=new_width;
-        qnx->height=new_height;
+        qnx->width=size[0];
+        qnx->height=size[1];
     }
 }
 
@@ -437,14 +442,14 @@ static int dpi_get_density(qnx_ctx_data_vk_t *qnx){
     return min(screen_dpi[0], screen_dpi[1]);
 
     error:
-    RARCH_ERR("screen failed to get DPI\n");
+    RARCH_ERR("[Screen/Vk]: screen failed to get DPI\n");
     return NULL;
 }
 
 
 static bool qnx_gfx_ctx_vk_get_metrics(void *data, enum display_metric_types type, float *value){
 
-    static int dpi = -1;
+    static int dpi = -1; /*set up to only query once...*/
     qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
     switch(type){
@@ -559,7 +564,7 @@ const gfx_ctx_driver_t gfx_ctx_qnx_vk = {
    qnx_gfx_ctx_vk_set_resize, 
    qnx_gfx_ctx_vk_has_focus,
    qnx_gfx_ctx_vk_suppress_screensaver,
-   false, /* has_windowed */
+   true, /* has_windowed */
    qnx_gfx_ctx_vk_swap_buffers,
    qnx_gfx_ctx_vk_input_driver,
    qnx_gfx_ctx_vk_get_proc_address,

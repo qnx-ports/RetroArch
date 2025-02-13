@@ -3068,18 +3068,21 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
       if (!swap_interval && present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
       {
          swapchain_present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+         RARCH_LOG("SET TO MAILBOX PRESENT MODE\n"); //QNX DEBUG
          break;
       }
       else if (!swap_interval && present_modes[i]
             == VK_PRESENT_MODE_IMMEDIATE_KHR)
       {
          swapchain_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+         RARCH_LOG("SET TO IMMEDIATE PRESENT MODE\n"); //QNX DEBUG
          break;
       }
       else if (swap_interval && present_modes[i] == VK_PRESENT_MODE_FIFO_KHR)
       {
          /* Kind of tautological since FIFO must always be present. */
          swapchain_present_mode = VK_PRESENT_MODE_FIFO_KHR;
+         RARCH_LOG("SET TO FIFO PRESENT MODE\n"); //QNX DEBUG
          break;
       }
    }
@@ -3258,8 +3261,8 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
    if (old_swapchain != VK_NULL_HANDLE)
       vkDestroySwapchainKHR(vk->context.device, old_swapchain, NULL);
 #endif
-   info.imageFormat =VK_FORMAT_B8G8R8A8_UNORM; //QNX DEBUG
-   RARCH_LOG("[Vulkan/Debug] Format: %d.", info.imageFormat);
+   //info.imageFormat =VK_FORMAT_B8G8R8A8_UNORM; //QNX DEBUG
+   RARCH_LOG("[Vulkan/Debug] Format: %d.\n", info.imageFormat);
    if (vkCreateSwapchainKHR(vk->context.device,
             &info, NULL, &vk->swapchain) != VK_SUCCESS)
    {
