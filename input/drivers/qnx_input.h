@@ -54,10 +54,19 @@ struct input_pointer {
    int16_t full_x, full_y;
 };
 
+struct input_mouse {
+    int16_t x, y, x_del, y_del;
+    bool lmb, mmb, rmb;
+};
+
 #define QNX_MAX_KEYS (65535 + 7) / 8
 #define TRACKPAD_CPI 500
 #define TRACKPAD_THRESHOLD TRACKPAD_CPI / 2
 #define MAX_TOUCH 4
+
+#define QNX_LMB_MASK 0b001;
+#define QNX_MMB_MASK 0b010;
+#define QNX_RMB_MASK 0b100;
 
 typedef struct qnx_input {
     uint64_t pad_state[DEFAULT_MAX_PADS];
@@ -73,6 +82,8 @@ typedef struct qnx_input {
    unsigned pointer_count;
    unsigned pads_connected;
 
+   struct input_mouse mouse;
+
    qnx_input_device_t devices[DEFAULT_MAX_PADS];
 
 } qnx_input_t;
@@ -85,11 +96,14 @@ static void qnx_process_keyboard_event(qnx_input_t *qnx, screen_event_t screen_e
 static void qnx_process_joystick_event(qnx_input_t *qnx, screen_event_t screen_ev, int type);
 static void qnx_process_gamepad_event(qnx_input_t *qnx, screen_event_t screen_ev, int type);
 static void qnx_process_touch_event(qnx_input_t *qnx, screen_event_t screen_ev, int type);
+static void qnx_process_mouse_event(qnx_input_t *qnx, screen_event_t screen_ev, int type);
 static void qnx_handle_device(qnx_input_t *qnx, qnx_input_device_t* controller);
 static void qnx_input_autodetect_gamepad(qnx_input_t *qnx, qnx_input_device_t *controller);
 static int qnx_discover_controllers(qnx_input_t *qnx);
 static bool qnx_keyboard_pressed(qnx_input_t *qnx, unsigned id);
 static int16_t qnx_pointer_input_state(qnx_input_t *qnx, unsigned idx, unsigned id, bool screen);
+static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id);
 static int16_t qnx_input_state(void *data, const input_device_driver_t *joypad, const input_device_driver_t *sec_joypad, rarch_joypad_info_t *joypad_info, const retro_keybind_set *binds, bool keyboard_mapping_blocked, unsigned port, unsigned device, unsigned idx, unsigned id);
 static void qnx_input_free_input(void *data);
+void qnx_grab_mouse(void *data, bool state);
 static uint64_t qnx_input_get_capabilities(void *data);

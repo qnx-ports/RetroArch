@@ -38,6 +38,7 @@
  */
 static void qnx_init_controller(qnx_input_t *qnx, qnx_input_device_t *controller){
     if (!qnx) return;
+    if(!controller) return;
     controller->handle      = 0;
     controller->type        = 0;
     controller->analogCount = 0;
@@ -69,15 +70,21 @@ static void *qnx_input_init(const char *joypad_driver){
         qnx->touch_map[i] = -1;
     }
 
+    qnx->mouse.x            = -1;
+    qnx->mouse.y            = -1; 
+    qnx->mouse.x_del        = 0;
+    qnx->mouse.y_del        = 0;
+
     for (i = 0; i < DEFAULT_MAX_PADS; ++i)
         qnx_init_controller(qnx, &qnx->devices[i]);
 
+    /* Initialize Playbook keyboard. */ //Not needed anymore...
+    // strlcpy(qnx->devices[0].id, "0A5C-8502",
+    //     sizeof(qnx->devices[0].id));
+    // qnx_input_autodetect_gamepad(qnx, &qnx->devices[0]);
+    // qnx->pads_connected = 1;
 
-    /* Initialize Playbook keyboard. */
-    strlcpy(qnx->devices[0].id, "0A5C-8502",
-        sizeof(qnx->devices[0].id));
-    qnx_input_autodetect_gamepad(qnx, &qnx->devices[0]);
-    qnx->pads_connected = 1;
+    printf("[Screen/In]: Discovering controllers... %s\n",qnx_discover_controllers(qnx)?"Success":"Failure");
 
     return qnx;
 }
@@ -140,6 +147,9 @@ static void qnx_input_poll( void *data){
             case SCREEN_EVENT_MTOUCH_RELEASE:
                 qnx_process_touch_event(qnx, screen_ev, val);
             break;
+            case SCREEN_EVENT_POINTER:
+                qnx_process_mouse_event(qnx, screen_ev, val);
+            break;
 
             /* Device connect/disconnect */
             case SCREEN_EVENT_DEVICE:
@@ -154,7 +164,7 @@ static void qnx_input_poll( void *data){
 
                 /* Process if one of our supported devices */
                 /* Check if attachment or detachment */
-                if (attached && (type == SCREEN_EVENT_GAMEPAD || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_KEYBOARD)){
+                if (attached && (type == SCREEN_EVENT_GAMEPAD || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_KEYBOARD || type == SCREEN_EVENT_POINTER)){
                     /* Search for open slot & attach device to that handle. */
                     for (i=0; i < DEFAULT_MAX_PADS; i++){
                         if (!qnx->devices[i].handle){
@@ -178,6 +188,25 @@ static void qnx_input_poll( void *data){
 
 /*### Processing Events ###*/
 
+static void qnx_process_mouse_event(qnx_input_t *qnx, screen_event_t screen_ev, int type){
+    int pos[2] = {0,0}, buttons=0;
+    screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_POSITION, &pos);
+    screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_BUTTONS, &buttons);
+    
+    if(qnx->mouse.x>-1)
+        qnx->mouse.x_del += pos[0] - qnx->mouse.x;
+
+    if(qnx->mouse.y>-1)
+        qnx->mouse.y_del += pos[1] - qnx->mouse.y;
+
+    qnx->mouse.x    = pos[0];
+    qnx->mouse.y    = pos[1];
+    qnx->mouse.lmb  = buttons & QNX_LMB_MASK;
+    qnx->mouse.mmb  = buttons & QNX_MMB_MASK;
+    qnx->mouse.rmb  = buttons & QNX_RMB_MASK;
+    RARCH_LOG("[Screen/In]: MOUSE: %d %d, v%d v%d,%s%s%s.\n", qnx->mouse.x, qnx->mouse.y, qnx->mouse.x_del, qnx->mouse.y_del, qnx->mouse.lmb?"L":(buttons?"":"None"), qnx->mouse.mmb?"M":"", qnx->mouse.rmb?"R":"");
+}
+
 /**
  * qnx_process_keyboard_event:
  * Processes screen's keyboard input and adjusts the input state accordingly.
@@ -194,6 +223,7 @@ static void qnx_process_keyboard_event(qnx_input_t *qnx, screen_event_t screen_e
     bool keydown     = flags & KEY_DOWN;
     bool keyrepeat   = flags & KEY_REPEAT;
     /* Fire keyboard event */
+    RARCH_LOG("KEYBOARD EVENT - 0x%x %s, %s\n", keycode, keydown?"press":"release", keyrepeat?"RPT":"");
     if (!keyrepeat)
         input_keyboard_event(keydown, keycode, 0, mod, RETRO_DEVICE_KEYBOARD);
 
@@ -218,6 +248,8 @@ static void qnx_process_gamepad_event(qnx_input_t *qnx, screen_event_t screen_ev
     screen_device_t device;
     qnx_input_device_t* controller = NULL;
     (void) type;
+
+    RARCH_LOG("GAMEPAD EVENT\n");
 
     /* Locate the device which created this event */
     screen_get_event_property_pv(screen_event, SCREEN_PROPERTY_DEVICE, (void**)&device);
@@ -249,6 +281,8 @@ static void qnx_process_joystick_event(qnx_input_t *qnx, screen_event_t screen_e
     int displacement[2];
     screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_DISPLACEMENT, displacement);
 
+    RARCH_LOG("JOYSTICK EVENT\n");
+    
     if (displacement != 0){
         qnx->trackpad_acc[0] += displacement[0];
         if (abs(qnx->trackpad_acc[0]) > TRACKPAD_THRESHOLD){
@@ -431,7 +465,7 @@ static void qnx_handle_device(qnx_input_t *qnx, qnx_input_device_t* controller){
 
     /*Screen service will map supported controllers, might need to adjust. */
     qnx_input_autodetect_gamepad(qnx, controller);
-
+#define DEBUG
 #ifdef DEBUG
     if (controller->type == SCREEN_EVENT_GAMEPAD)
         RARCH_LOG("Gamepad Device Connected:\n");
@@ -439,6 +473,8 @@ static void qnx_handle_device(qnx_input_t *qnx, qnx_input_device_t* controller){
         RARCH_LOG("Joystick Device Connected:\n");
     else if (controller->type == SCREEN_EVENT_KEYBOARD)
         RARCH_LOG("Keyboard Device Connected:\n");
+    else if (controller->type == SCREEN_EVENT_POINTER)
+        RARCH_LOG("Mouse Device Connected:\n");
 
     RARCH_LOG("\tID: %s\n", controller->id);
     RARCH_LOG("\tVendor  ID: %s\n", controller->vid);
@@ -520,7 +556,7 @@ static int qnx_discover_controllers(qnx_input_t *qnx){
         screen_get_device_property_iv(devices_found[i], SCREEN_PROPERTY_TYPE, &type);
 
         /* Make sure type is supported */
-        if (type == SCREEN_EVENT_GAMEPAD  || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_KEYBOARD){
+        if (type == SCREEN_EVENT_GAMEPAD  || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_KEYBOARD || type == SCREEN_EVENT_POINTER){
             qnx->devices[qnx->pads_connected].handle = devices_found[i];
             qnx->devices[qnx->pads_connected].index = qnx->pads_connected;
             qnx_handle_device(qnx, &qnx->devices[qnx->pads_connected]);
@@ -546,7 +582,7 @@ static bool qnx_keyboard_pressed(qnx_input_t *qnx, unsigned id){
 
 /**
  * qnx_pointer_input_state:
- * Returns mouse pointer info.
+ * Returns touch pointer info.
  */
 static int16_t qnx_pointer_input_state(qnx_input_t *qnx, unsigned idx, unsigned id, bool screen){
     int16_t x;
@@ -568,6 +604,33 @@ static int16_t qnx_pointer_input_state(qnx_input_t *qnx, unsigned idx, unsigned 
         case RETRO_DEVICE_ID_POINTER_PRESSED:
             return (idx < qnx->pointer_count) && (x != -0x8000) && (y != -0x8000);
     }
+}
+
+int16_t find_and_flush(int16_t *target, int16_t fval){
+    int toreturn = *target;
+    *target = fval;
+    return toreturn;
+}
+
+/**
+ * 
+ */
+static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id){
+    RARCH_LOG("[Screen/In]: Querying Mouse\n");
+    switch(id){
+        case RETRO_DEVICE_ID_MOUSE_X:
+            return find_and_flush(qnx->mouse.x_del, 0);
+        case RETRO_DEVICE_ID_MOUSE_Y:
+            return find_and_flush(qnx->mouse.y_del, 0);
+        case RETRO_DEVICE_ID_MOUSE_LEFT:
+            return qnx->mouse.lmb;
+        case RETRO_DEVICE_ID_MOUSE_MIDDLE:
+            return qnx->mouse.mmb;
+        case RETRO_DEVICE_ID_MOUSE_RIGHT:
+            return qnx->mouse.rmb;
+        /*TODO: Scrollwheel support */
+    }
+    return 0;
 }
 
 /**
@@ -621,6 +684,9 @@ static int16_t qnx_input_state(
         case RETRO_DEVICE_POINTER:
         case RARCH_DEVICE_POINTER_SCREEN:
         return qnx_pointer_input_state(qnx, idx, id, device == RARCH_DEVICE_POINTER_SCREEN);
+        case RETRO_DEVICE_MOUSE:
+        case RARCH_DEVICE_MOUSE_SCREEN:
+        return qnx_mouse_input_state(qnx, id);
         default:
         break;
    }
@@ -648,8 +714,11 @@ static uint64_t qnx_input_get_capabilities(void *data){
           (1 << RETRO_DEVICE_JOYPAD)
         | (1 << RETRO_DEVICE_POINTER)
         | (1 << RETRO_DEVICE_ANALOG)
-        | (1 << RETRO_DEVICE_KEYBOARD);
+        | (1 << RETRO_DEVICE_KEYBOARD)
+        | (1 << RETRO_DEVICE_MOUSE);
 }
+
+void qnx_grab_mouse(void *data, bool state){}
 
 /*##############################################*/
 /*                    Driver                    */
@@ -664,7 +733,7 @@ input_driver_t input_qnx = {
    NULL,
    qnx_input_get_capabilities,
    "qnx_input",
-   NULL,
+   qnx_grab_mouse,
    NULL,
    NULL
 };

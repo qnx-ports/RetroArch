@@ -85,6 +85,7 @@ static void qnx_gfx_ctx_vk_destroy(void *data){
 } /*qnx_gfx_ctx_vk_destroy*/
 
 static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){  
+#ifdef DEBUG
     char * buf = calloc(64, sizeof(char));
     int buf_i = -1;
     if(!buf){
@@ -221,6 +222,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx){
     }
     RARCH_LOG("=============================\n");
     free(buf);
+#endif
 }
 
 /**

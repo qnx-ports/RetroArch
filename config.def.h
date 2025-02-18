@@ -585,8 +585,13 @@
 #endif
 
 #ifdef HAVE_OZONE
+#ifdef __QNX__
+/* Ozone colour theme: 9 == Solarized Light */
+#define DEFAULT_OZONE_COLOR_THEME 9 
+#else
 /* Ozone colour theme: 1 == Basic Black */
 #define DEFAULT_OZONE_COLOR_THEME 1
+#endif
 #define DEFAULT_OZONE_COLLAPSE_SIDEBAR false
 #define DEFAULT_OZONE_SCROLL_CONTENT_METADATA false
 #define DEFAULT_OZONE_THUMBNAIL_SCALE_FACTOR 1.0f
