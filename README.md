@@ -1,3 +1,14 @@
+# RetroArch for QNX
+
+Hello! This repo houses the QNX 8.0 port of RetroArch.
+This is meant to run on 'modern' devices; i.e. ones that follow a supported QNX 8.0 archiecture (aarch64le or x86_64).
+*Blackberry phones are not compatible with this version. To build for that, follow the instructions at the [Upstream Branch](https://github.com/libretro/RetroArch)*
+
+Instructions for building and testing can be found [here, at our build-files repo](https://github.com/build-files). (Note: currently under the `retropie` branch `ports/RetroPie/RetroArch`, in development)
+
+The rest of this document is a copy of the upstream README.md file.
+----
+
 [![Build Status](https://travis-ci.org/libretro/RetroArch.svg?branch=master)](https://travis-ci.org/libretro/RetroArch)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/8936/badge.svg)](https://scan.coverity.com/projects/retroarch)
 [![Crowdin](https://badges.crowdin.net/retroarch/localized.svg)](https://crowdin.com/project/retroarch)
