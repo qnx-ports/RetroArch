@@ -275,6 +275,12 @@ else
    check_lib '' AL -lopenal alcOpenDevice
 fi
 
+# QNX build does not use SDL for input or display, and can break cross-compilation
+if [ "$OS" = 'qnx' ]; then
+   HAVE_SDL=no
+   HAVE_SDL2=no
+fi
+
 check_pkgconf RSOUND rsound 1.1
 check_pkgconf ROAR libroar 1.0.12
 check_val '' JACK -ljack '' jack 0.120.1 '' false
