@@ -84,7 +84,7 @@ static void *qnx_input_init(const char *joypad_driver){
     // qnx_input_autodetect_gamepad(qnx, &qnx->devices[0]);
     // qnx->pads_connected = 1;
 
-    printf("[Screen/In]: Discovering controllers... %s\n",qnx_discover_controllers(qnx)?"Success":"Failure");
+    //printf("[Screen/In]: Discovering controllers... %s\n",qnx_discover_controllers(qnx)?"Success":"Failure");
 
     return qnx;
 }
@@ -134,12 +134,15 @@ static void qnx_input_poll( void *data){
         switch (val){
             /* Pass to Processing Functions */
             case SCREEN_EVENT_KEYBOARD:
+                //printf("processing keyboard event\n");
                 qnx_process_keyboard_event(qnx, screen_ev, val);
             break;
             case SCREEN_EVENT_GAMEPAD:
+                //printf("processing gamepad event\n");
                 qnx_process_gamepad_event(qnx, screen_ev, val);
             break;
             case SCREEN_EVENT_JOYSTICK:
+                //printf("processing joystick event\n");
                 qnx_process_joystick_event(qnx, screen_ev, val);
             break;
             case SCREEN_EVENT_MTOUCH_TOUCH:
@@ -148,6 +151,7 @@ static void qnx_input_poll( void *data){
                 qnx_process_touch_event(qnx, screen_ev, val);
             break;
             case SCREEN_EVENT_POINTER:
+                //printf("processing pointer event\n");
                 qnx_process_mouse_event(qnx, screen_ev, val);
             break;
 
@@ -204,7 +208,7 @@ static void qnx_process_mouse_event(qnx_input_t *qnx, screen_event_t screen_ev, 
     qnx->mouse.lmb  = buttons & QNX_LMB_MASK;
     qnx->mouse.mmb  = buttons & QNX_MMB_MASK;
     qnx->mouse.rmb  = buttons & QNX_RMB_MASK;
-    RARCH_LOG("[Screen/In]: MOUSE: %d %d, v%d v%d,%s%s%s.\n", qnx->mouse.x, qnx->mouse.y, qnx->mouse.x_del, qnx->mouse.y_del, qnx->mouse.lmb?"L":(buttons?"":"None"), qnx->mouse.mmb?"M":"", qnx->mouse.rmb?"R":"");
+    //RARCH_LOG("[Screen/In]: MOUSE: %d %d, v%d v%d,%s%s%s.\n", qnx->mouse.x, qnx->mouse.y, qnx->mouse.x_del, qnx->mouse.y_del, qnx->mouse.lmb?"L":(buttons?"":"None"), qnx->mouse.mmb?"M":"", qnx->mouse.rmb?"R":"");
 }
 
 /**
@@ -223,7 +227,7 @@ static void qnx_process_keyboard_event(qnx_input_t *qnx, screen_event_t screen_e
     bool keydown     = flags & KEY_DOWN;
     bool keyrepeat   = flags & KEY_REPEAT;
     /* Fire keyboard event */
-    RARCH_LOG("KEYBOARD EVENT - 0x%x %s, %s\n", keycode, keydown?"press":"release", keyrepeat?"RPT":"");
+    //RARCH_LOG("KEYBOARD EVENT - 0x%x %s, %s\n", keycode, keydown?"press":"release", keyrepeat?"RPT":"");
     if (!keyrepeat)
         input_keyboard_event(keydown, keycode, 0, mod, RETRO_DEVICE_KEYBOARD);
 
@@ -249,8 +253,6 @@ static void qnx_process_gamepad_event(qnx_input_t *qnx, screen_event_t screen_ev
     qnx_input_device_t* controller = NULL;
     (void) type;
 
-    RARCH_LOG("GAMEPAD EVENT\n");
-
     /* Locate the device which created this event */
     screen_get_event_property_pv(screen_event, SCREEN_PROPERTY_DEVICE, (void**)&device);
     for (i = 0; i < DEFAULT_MAX_PADS; ++i){
@@ -258,7 +260,10 @@ static void qnx_process_gamepad_event(qnx_input_t *qnx, screen_event_t screen_ev
          controller = (qnx_input_device_t*)&qnx->devices[i];
          break;
     }} /*if, for*/
-    if (!controller) return; 
+    if (!controller) return;
+
+    //FOR TESTING PURPOSES:
+    // controller  = (qnx_input_device_t*)&qnx->devices[0];
 
     /* Store the new state */
     screen_get_event_property_iv(screen_event, SCREEN_PROPERTY_BUTTONS, &controller->buttons);
@@ -280,8 +285,6 @@ static void qnx_process_gamepad_event(qnx_input_t *qnx, screen_event_t screen_ev
 static void qnx_process_joystick_event(qnx_input_t *qnx, screen_event_t screen_ev, int type){
     int displacement[2];
     screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_DISPLACEMENT, displacement);
-
-    RARCH_LOG("JOYSTICK EVENT\n");
     
     if (displacement != 0){
         qnx->trackpad_acc[0] += displacement[0];
@@ -545,9 +548,14 @@ static int qnx_discover_controllers(qnx_input_t *qnx){
     }
 
     /* Scan the list for gamepad and joystick devices. */
-    for (i = 0; i < qnx->pads_connected; ++i)
+    for (i = 0; i < qnx->pads_connected; i++)
         qnx_init_controller(qnx, &qnx->devices[i]);
+
+    //make sure we keep track of how many are connected
     qnx->pads_connected = 0;
+
+    //Guarantee that the first gamepad takes the slot
+    int gamepad_not_connected=1;
 
     /* Check all devices */
     for (i = 0; i < deviceCount; i++){
@@ -556,11 +564,20 @@ static int qnx_discover_controllers(qnx_input_t *qnx){
         screen_get_device_property_iv(devices_found[i], SCREEN_PROPERTY_TYPE, &type);
 
         /* Make sure type is supported */
-        if (type == SCREEN_EVENT_GAMEPAD  || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_KEYBOARD || type == SCREEN_EVENT_POINTER){
-            qnx->devices[qnx->pads_connected].handle = devices_found[i];
-            qnx->devices[qnx->pads_connected].index = qnx->pads_connected;
-            qnx_handle_device(qnx, &qnx->devices[qnx->pads_connected]);
-            if (qnx->pads_connected == DEFAULT_MAX_PADS) break;
+        /* Note: Keyboard should not take up a slot, as it is stored separately.*/
+        if (type == SCREEN_EVENT_GAMEPAD  || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_POINTER){
+            if(type == SCREEN_EVENT_GAMEPAD && !gamepad_not_connected){
+                qnx->devices[0].handle = devices_found[i];
+                qnx->devices[0].index = 0;
+                qnx_handle_device(qnx, &qnx->devices[0]);
+                gamepad_not_connected = 0;
+                if (qnx->pads_connected >= DEFAULT_MAX_PADS) break;
+            }else{
+                qnx->devices[qnx->pads_connected+gamepad_not_connected].handle = devices_found[i];
+                qnx->devices[qnx->pads_connected+gamepad_not_connected].index = qnx->pads_connected+gamepad_not_connected;
+                qnx_handle_device(qnx, &qnx->devices[qnx->pads_connected+gamepad_not_connected]);
+                if (qnx->pads_connected+gamepad_not_connected >= DEFAULT_MAX_PADS) break;
+            }
         }
     }
 
@@ -616,7 +633,7 @@ int16_t find_and_flush(int16_t *target, int16_t fval){
  * 
  */
 static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id){
-    RARCH_LOG("[Screen/In]: Querying Mouse\n");
+    //RARCH_LOG("[Screen/In]: Querying Mouse\n");
     switch(id){
         case RETRO_DEVICE_ID_MOUSE_X:
             return find_and_flush(qnx->mouse.x_del, 0);
@@ -630,6 +647,34 @@ static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id){
             return qnx->mouse.rmb;
         /*TODO: Scrollwheel support */
     }
+    return 0;
+}
+
+static int retro_button_id_to_screen(unsigned id){
+    switch(id){
+        case RETRO_DEVICE_ID_JOYPAD_A:      return SCREEN_A_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_B:      return SCREEN_B_GAME_BUTTON;
+
+        case RETRO_DEVICE_ID_JOYPAD_X:      return SCREEN_X_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_Y:      return SCREEN_Y_GAME_BUTTON;
+
+        case RETRO_DEVICE_ID_JOYPAD_START:  return SCREEN_MENU1_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_SELECT: return SCREEN_MENU2_GAME_BUTTON;
+
+        case RETRO_DEVICE_ID_JOYPAD_L:      return SCREEN_L1_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_L2:     return SCREEN_L2_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_L3:     return SCREEN_L3_GAME_BUTTON;
+
+        case RETRO_DEVICE_ID_JOYPAD_R:      return SCREEN_R1_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_R2:     return SCREEN_R2_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_R3:     return SCREEN_R3_GAME_BUTTON;
+
+        case RETRO_DEVICE_ID_JOYPAD_UP:     return SCREEN_DPAD_UP_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_DOWN:   return SCREEN_DPAD_DOWN_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_LEFT:   return SCREEN_DPAD_LEFT_GAME_BUTTON;
+        case RETRO_DEVICE_ID_JOYPAD_RIGHT:  return SCREEN_DPAD_RIGHT_GAME_BUTTON;
+    }
+
     return 0;
 }
 
@@ -650,29 +695,41 @@ static int16_t qnx_input_state(
       unsigned id){
     qnx_input_t *qnx = (qnx_input_t*)data;
 
+    qnx->devices[idx].buttons;
+
     switch (device){
         case RETRO_DEVICE_JOYPAD:
+        //Full Mask
             if (id == RETRO_DEVICE_ID_JOYPAD_MASK){
                 unsigned i;
                 int16_t ret = 0;
-                if (!keyboard_mapping_blocked){
-                    for (i = 0; i < RARCH_FIRST_CUSTOM_BIND; i++){
-                        if (binds[port][i].valid){
-                            if (qnx_keyboard_pressed(qnx, binds[port][i].key))
-                            ret |= (1 << i);
+                for (i = 0; i < RARCH_FIRST_CUSTOM_BIND; i++){
+                    if (binds[port][i].valid){
+                        //printf("Querying port %u\n", port);
+                        //Keyboard
+                        if (!keyboard_mapping_blocked){
+                        if (qnx_keyboard_pressed(qnx, binds[port][i].key))
+                        ret |= (1 << i);
                         }
+                        //Appropriate Device
+                        if(retro_button_id_to_screen(binds[port][i].id) & qnx->devices[idx].buttons)
+                        ret |= (1 << i);
                     }
                 }
                 return ret;
             }
-
+        //Specific Buttons
             if (id < RARCH_BIND_LIST_END){
                 if (binds[port][id].valid){
+                    //Keyboard
                     if (
                             ((id == RARCH_GAME_FOCUS_TOGGLE) || 
                             !keyboard_mapping_blocked) && 
                             qnx_keyboard_pressed(qnx, binds[port][id].key)
                         )
+                        return 1;
+                    //Appropriate Device
+                    if(retro_button_id_to_screen(binds[port][id].id) & qnx->devices[idx].buttons)
                         return 1;
                 }
             }
@@ -709,7 +766,6 @@ static void qnx_input_free_input(void *data){
  * Helper that displays which devices are available.
  */
 static uint64_t qnx_input_get_capabilities(void *data){
-    /* Very clever implementation!!! */
     return
           (1 << RETRO_DEVICE_JOYPAD)
         | (1 << RETRO_DEVICE_POINTER)
