@@ -81,7 +81,7 @@ static int16_t qnx_joypad_axis_state(
             break;
       }
       if (val < 0){
-         printf("Axis Neg Get %d\n", val);
+         //printf("Axis Neg Get %d\n", val);
          return val;
       }
    }
@@ -101,7 +101,7 @@ static int16_t qnx_joypad_axis_state(
             break;
       }
       if (val > 0){
-         printf("Axis Pos Get %d\n", val);
+         //printf("Axis Pos Get %d\n", val);
          return val;
       }
    }
@@ -113,7 +113,7 @@ static int16_t qnx_joypad_axis(unsigned port, uint32_t joyaxis)
    qnx_input_t *qnx               =
       (qnx_input_t*)input_state_get_ptr()->current_data;
 
-   printf("Axis Query\n");
+   //printf("Axis Query\n");
    qnx_input_device_t* controller = NULL;
    if (!qnx || port >= DEFAULT_MAX_PADS)
       return 0;
