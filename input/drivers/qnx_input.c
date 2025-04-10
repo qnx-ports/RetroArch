@@ -41,8 +41,8 @@ static void qnx_init_controller(qnx_input_t *qnx, qnx_input_device_t *controller
     if(!controller) return;
     controller->handle      = 0;
     controller->type        = 0;
-    controller->analogCount = 0;
-    controller->buttonCount = 0;
+    controller->analogCount = 4;
+    controller->buttonCount = 19;
     controller->buttons     = 0;
     controller->analog0[0]  = 0;
     controller->analog0[1]  = 0;
@@ -84,7 +84,7 @@ static void *qnx_input_init(const char *joypad_driver){
     // qnx_input_autodetect_gamepad(qnx, &qnx->devices[0]);
     // qnx->pads_connected = 1;
 
-    //printf("[Screen/In]: Discovering controllers... %s\n",qnx_discover_controllers(qnx)?"Success":"Failure");
+    printf("[Screen/In]: Discovering controllers... %s\n",qnx_discover_controllers(qnx)?"Success":"Failure");
 
     return qnx;
 }
@@ -263,7 +263,7 @@ static void qnx_process_gamepad_event(qnx_input_t *qnx, screen_event_t screen_ev
     if (!controller) return;
 
     //FOR TESTING PURPOSES:
-    // controller  = (qnx_input_device_t*)&qnx->devices[0];
+    //controller  = (qnx_input_device_t*)&qnx->devices[0];
 
     /* Store the new state */
     screen_get_event_property_iv(screen_event, SCREEN_PROPERTY_BUTTONS, &controller->buttons);
@@ -285,6 +285,8 @@ static void qnx_process_gamepad_event(qnx_input_t *qnx, screen_event_t screen_ev
 static void qnx_process_joystick_event(qnx_input_t *qnx, screen_event_t screen_ev, int type){
     int displacement[2];
     screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_DISPLACEMENT, displacement);
+
+    printf("Joystick Event\n");
     
     if (displacement != 0){
         qnx->trackpad_acc[0] += displacement[0];
@@ -458,7 +460,8 @@ static void qnx_handle_device(qnx_input_t *qnx, qnx_input_device_t* controller){
 
     /* Special Gamepad Processing */
     if (controller->type == SCREEN_EVENT_GAMEPAD){
-        screen_get_device_property_iv(controller->handle, SCREEN_PROPERTY_BUTTON_COUNT, &controller->buttonCount);
+        printf("GAMEPAD STUFF CHECK!\n");
+        screen_get_device_property_iv(controller->handle, SCREEN_PROPERTY_BUTTON_COUNT, &(controller->buttonCount));
         /* Check for the existence of analog sticks. */
         if (!screen_get_device_property_iv(controller->handle, SCREEN_PROPERTY_ANALOG0, controller->analog0))
             ++controller->analogCount;
@@ -566,15 +569,17 @@ static int qnx_discover_controllers(qnx_input_t *qnx){
         /* Make sure type is supported */
         /* Note: Keyboard should not take up a slot, as it is stored separately.*/
         if (type == SCREEN_EVENT_GAMEPAD  || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_POINTER){
-            if(type == SCREEN_EVENT_GAMEPAD && !gamepad_not_connected){
+            if((type == SCREEN_EVENT_GAMEPAD || type == SCREEN_EVENT_JOYSTICK) && gamepad_not_connected){
                 qnx->devices[0].handle = devices_found[i];
                 qnx->devices[0].index = 0;
+                printf("At index 0\n");
                 qnx_handle_device(qnx, &qnx->devices[0]);
                 gamepad_not_connected = 0;
                 if (qnx->pads_connected >= DEFAULT_MAX_PADS) break;
             }else{
                 qnx->devices[qnx->pads_connected+gamepad_not_connected].handle = devices_found[i];
                 qnx->devices[qnx->pads_connected+gamepad_not_connected].index = qnx->pads_connected+gamepad_not_connected;
+                printf("At index %d\n", qnx->pads_connected+gamepad_not_connected);
                 qnx_handle_device(qnx, &qnx->devices[qnx->pads_connected+gamepad_not_connected]);
                 if (qnx->pads_connected+gamepad_not_connected >= DEFAULT_MAX_PADS) break;
             }
@@ -650,6 +655,10 @@ static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id){
     return 0;
 }
 
+static int screen_button_id_to_retro(unsigned id){
+
+}
+
 static int retro_button_id_to_screen(unsigned id){
     switch(id){
         case RETRO_DEVICE_ID_JOYPAD_A:      return SCREEN_A_GAME_BUTTON;
@@ -675,7 +684,8 @@ static int retro_button_id_to_screen(unsigned id){
         case RETRO_DEVICE_ID_JOYPAD_RIGHT:  return SCREEN_DPAD_RIGHT_GAME_BUTTON;
     }
 
-    return 0;
+    
+    return (1<<20); //Unused.
 }
 
 /**
@@ -695,8 +705,6 @@ static int16_t qnx_input_state(
       unsigned id){
     qnx_input_t *qnx = (qnx_input_t*)data;
 
-    qnx->devices[idx].buttons;
-
     switch (device){
         case RETRO_DEVICE_JOYPAD:
         //Full Mask
@@ -712,8 +720,9 @@ static int16_t qnx_input_state(
                         ret |= (1 << i);
                         }
                         //Appropriate Device
-                        if(retro_button_id_to_screen(binds[port][i].id) & qnx->devices[idx].buttons)
-                        ret |= (1 << i);
+                        
+                        //if(retro_button_id_to_screen(binds[port][i].joykey) & qnx->devices[port].buttons)
+                        //ret |= (1 << i);
                     }
                 }
                 return ret;
@@ -729,8 +738,8 @@ static int16_t qnx_input_state(
                         )
                         return 1;
                     //Appropriate Device
-                    if(retro_button_id_to_screen(binds[port][id].id) & qnx->devices[idx].buttons)
-                        return 1;
+                    //if(retro_button_id_to_screen(binds[port][id].joykey) & qnx->devices[port].buttons)
+                    //    return 1;
                 }
             }
         break;
