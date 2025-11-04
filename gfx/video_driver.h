@@ -664,7 +664,7 @@ typedef struct video_poke_interface
          unsigned width, unsigned height, float alpha);
    /* Enable or disable rendering. */
    void (*set_texture_enable)(void *data, bool enable, bool full_screen);
-   void (*set_osd_msg)(void *data, 
+   void (*set_osd_msg)(void *data,
          const char *msg,
          const void *params, void *font);
 
@@ -677,11 +677,11 @@ typedef struct video_poke_interface
    bool (*get_hw_render_interface)(void *data,
          const struct retro_hw_render_interface **iface);
 
-   /* hdr settings */ 
+   /* hdr settings */
    void (*set_hdr_max_nits)(void *data, float max_nits);
    void (*set_hdr_paper_white_nits)(void *data, float paper_white_nits);
    void (*set_hdr_contrast)(void *data, float contrast);
-   void (*set_hdr_expand_gamut)(void *data, bool expand_gamut);         
+   void (*set_hdr_expand_gamut)(void *data, bool expand_gamut);
 } video_poke_interface_t;
 
 /* msg is for showing a message on the screen

@@ -305,10 +305,10 @@ VIDEO CONTEXT
 #include "../gfx/drivers_display/gfx_display_vulkan.c"
 #include "../libretro-common/vulkan/vulkan_symbol_wrapper.c"
 #if defined(__QNX__)
+#include "../gfx/drivers_context/qnx_vk_ctx.c"
+#elif defined(HAVE_VULKAN_DISPLAY)
 #include "../gfx/drivers_context/khr_display_ctx.c"
 #endif
-#elif defined( HAVE_VULKAN_DISPLAY)
-#include "../gfx/drivers_context/qnx_vk_ctx.c"
 #endif
 
 

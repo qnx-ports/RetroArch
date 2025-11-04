@@ -31,20 +31,20 @@
 
 /*### Structs ###*/
 typedef struct {
-    screen_device_t handle;
-    int type;
-    int analogCount;
-    int buttonCount;
-    int device;
-    int port;
-    int index;
-    /* Current state. */
-    int buttons;
-    int analog0[3];
-    int analog1[3];
-    char id[64];
-    char vid[64];
-    char pid[64];
+   screen_device_t handle;
+   int type;
+   int analogCount;
+   int buttonCount;
+   int device;
+   int port;
+   int index;
+   /* Current state. */
+   int buttons;
+   int analog0[3];
+   int analog1[3];
+   char id[64];
+   char vid[64];
+   char pid[64];
 } qnx_input_device_t;
 
 struct input_pointer {
@@ -55,8 +55,8 @@ struct input_pointer {
 };
 
 struct input_mouse {
-    int16_t x, y, x_del, y_del;
-    bool lmb, mmb, rmb;
+   int16_t x, y, x_del, y_del;
+   bool lmb, mmb, rmb;
 };
 
 #define QNX_MAX_KEYS (65535 + 7) / 8
@@ -69,13 +69,13 @@ struct input_mouse {
 #define QNX_RMB_MASK 0b100;
 
 typedef struct qnx_input {
-    uint64_t pad_state[DEFAULT_MAX_PADS];
-    uint8_t keyboard_state[QNX_MAX_KEYS];
+   uint64_t pad_state[DEFAULT_MAX_PADS];
+   uint8_t keyboard_state[QNX_MAX_KEYS];
 
-    /*The first pointer_count indices of touch_map will be a valid,
-    * active index in pointer array.
-    * Saves us from searching through pointer array when polling state.
-    */
+   /*The first pointer_count indices of touch_map will be a valid,
+   * active index in pointer array.
+   * Saves us from searching through pointer array when polling state.
+   */
    struct input_pointer pointer[MAX_TOUCH]; /* int alignment */
    int touch_map[MAX_TOUCH];
    int trackpad_acc[2];

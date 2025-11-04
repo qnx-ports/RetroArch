@@ -3185,9 +3185,6 @@ static void vulkan_set_texture_frame(void *data,
       const void *frame, bool rgb32, unsigned width, unsigned height,
       float alpha)
 {
-   //QNX DEBUG
-   rgb32=true;
-
    size_t y;
    unsigned stride;
    uint8_t *ptr                        = NULL;
@@ -3213,13 +3210,13 @@ static void vulkan_set_texture_frame(void *data,
    if (!rgb32)
    {
        VkFormatProperties formatProperties;
-       vkGetPhysicalDeviceFormatProperties(vk->context->gpu, VK_FORMAT_B4G4R4A4_UNORM_PACK16 /*VK_FORMAT_R5G6B5_UNORM_PACK16*/, &formatProperties); //QNX DEBUG
+       vkGetPhysicalDeviceFormatProperties(vk->context->gpu, VK_FORMAT_B4G4R4A4_UNORM_PACK16, &formatProperties);
        if (formatProperties.optimalTilingFeatures != 0)
        {
            /* B4G4R4A4 must be supported, but R4G4B4A4 is optional,
             * just apply the swizzle in the image view instead. */
-           fmt         = VK_FORMAT_B4G4R4A4_UNORM_PACK16;/* VK_FORMAT_R5G6B5_UNORM_PACK16;*/
-           RARCH_LOG("[QNX_DEBUG]: switch to B4G4R4A4\n");
+           fmt         = VK_FORMAT_B4G4R4A4_UNORM_PACK16;
+           RARCH_LOG("[QNX DEBUG]: switch to B4G4R4A4\n");
            ptr_swizzle = &br_swizzle;
        }
        else

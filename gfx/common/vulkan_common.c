@@ -32,6 +32,10 @@
 #endif
 #endif
 
+#ifdef __QNX__
+#include <screen/screen.h>
+#endif
+
 #include "vulkan_common.h"
 #include "../include/vulkan/vulkan.h"
 #include "vksym.h"
@@ -2486,7 +2490,6 @@ bool vulkan_surface_create(gfx_ctx_vulkan_data_t *vk,
          break;
       case VULKAN_WSI_QNX:
 #ifdef __QNX__
-#include <screen/screen.h>
          {
          VkScreenSurfaceCreateInfoQNX create_info;
          PFN_vkCreateScreenSurfaceQNX create;
