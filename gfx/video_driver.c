@@ -3260,8 +3260,6 @@ bool video_driver_init_internal(bool *video_is_threaded, bool verbosity_enabled)
    input_driver_state_t *input_st         = input_state_get_ptr();
    video_driver_state_t *video_st         = &video_driver_st;
    struct retro_game_geometry *geom       = &video_st->av_info.geometry;
-   // //QNX DEBUG
-   // video_st->pix_fmt = RETRO_PIXEL_FORMAT_XRGB8888;
    const enum retro_pixel_format
       video_driver_pix_fmt                = video_st->pix_fmt;
 #ifdef HAVE_VIDEO_FILTER
@@ -3474,9 +3472,6 @@ bool video_driver_init_internal(bool *video_is_threaded, bool verbosity_enabled)
    video.rgb32                       =
          (video_driver_pix_fmt == RETRO_PIXEL_FORMAT_XRGB8888);
 #endif
-   // //QNX DEBUG
-   // video.rgb32=1;
-   // //QNX DEBUG
    video.parent                      = 0;
 
    if (video.fullscreen)

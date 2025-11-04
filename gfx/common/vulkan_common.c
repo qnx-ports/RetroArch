@@ -180,7 +180,7 @@ static void vulkan_emulated_mailbox_loop(void *userdata)
 {
    VkFence fence;
    VkFenceCreateInfo info;
-   struct vulkan_emulated_mailbox *mailbox = 
+   struct vulkan_emulated_mailbox *mailbox =
       (struct vulkan_emulated_mailbox*)userdata;
 
    if (!mailbox)
@@ -195,7 +195,7 @@ static void vulkan_emulated_mailbox_loop(void *userdata)
    for (;;)
    {
       slock_lock(mailbox->lock);
-      while (   !(mailbox->flags & VK_MAILBOX_FLAG_DEAD) 
+      while (   !(mailbox->flags & VK_MAILBOX_FLAG_DEAD)
              && !(mailbox->flags & VK_MAILBOX_FLAG_REQUEST_ACQUIRE))
          scond_wait(mailbox->cond, mailbox->lock);
 
@@ -213,9 +213,9 @@ static void vulkan_emulated_mailbox_loop(void *userdata)
       mailbox->result          = vkAcquireNextImageKHR(
             mailbox->device, mailbox->swapchain, UINT64_MAX,
             VK_NULL_HANDLE, fence, &mailbox->index);
-      /* VK_SUBOPTIMAL_KHR can be returned on Android 10 
+      /* VK_SUBOPTIMAL_KHR can be returned on Android 10
        * when prerotate is not dealt with.
-       * This is not an error we need to care about, 
+       * This is not an error we need to care about,
        * and we'll treat it as SUCCESS. */
       if (mailbox->result == VK_SUBOPTIMAL_KHR)
          mailbox->result = VK_SUCCESS;
@@ -736,7 +736,7 @@ struct vk_texture vulkan_create_texture(vk_t *vk,
             {
                VkBufferImageCopy region;
                VkCommandBuffer staging;
-               enum VkImageLayout layout_fmt = 
+               enum VkImageLayout layout_fmt =
                   (tex.flags & VK_TEX_FLAG_MIPMAP)
                   ? VK_IMAGE_LAYOUT_GENERAL
                   : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -754,10 +754,10 @@ struct vk_texture vulkan_create_texture(vk_t *vk,
 
                vkBeginCommandBuffer(staging, &begin_info);
 
-               /* If doing mipmapping on upload, keep in general 
+               /* If doing mipmapping on upload, keep in general
                 * so we can easily do transfers to
                 * and transfers from the images without having to
-                * mess around with lots of extra transitions at 
+                * mess around with lots of extra transitions at
                 * per-level granularity.
                 */
                VULKAN_IMAGE_LAYOUT_TRANSITION(
@@ -2591,9 +2591,9 @@ void vulkan_present(gfx_ctx_vulkan_data_t *vk, unsigned index)
    err = vkQueuePresentKHR(vk->context.queue, &present);
 
 #ifdef ANDROID
-   /* VK_SUBOPTIMAL_KHR can be returned on 
+   /* VK_SUBOPTIMAL_KHR can be returned on
     * Android 10 when prerotate is not dealt with.
-    * This is not an error we need to care about, 
+    * This is not an error we need to care about,
     * and we'll treat it as SUCCESS. */
    if (result == VK_SUBOPTIMAL_KHR)
       result = VK_SUCCESS;
@@ -2713,7 +2713,7 @@ static VkSemaphore vulkan_get_wsi_acquire_semaphore(struct vulkan_context *ctx)
    if (ctx->num_recycled_acquire_semaphores == 0)
    {
       VkSemaphoreCreateInfo sem_info;
-      
+
       sem_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
       sem_info.pNext = NULL;
       sem_info.flags = 0;
@@ -2797,7 +2797,7 @@ void vulkan_acquire_next_image(gfx_ctx_vulkan_data_t *vk)
    fence_info.sType               = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
    fence_info.pNext               = NULL;
    fence_info.flags               = 0;
-   
+
    sem_info.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
    sem_info.pNext                 = NULL;
    sem_info.flags                 = 0;
@@ -2852,9 +2852,9 @@ retry:
             vk->swapchain, UINT64_MAX,
             semaphore, fence, &vk->context.current_swapchain_index);
 #ifdef ANDROID
-      /* VK_SUBOPTIMAL_KHR can be returned on Android 10 
+      /* VK_SUBOPTIMAL_KHR can be returned on Android 10
        * when prerotate is not dealt with.
-       * This is not an error we need to care about, and 
+       * This is not an error we need to care about, and
        * we'll treat it as SUCCESS. */
       if (err == VK_SUBOPTIMAL_KHR)
          err = VK_SUCCESS;
@@ -3011,7 +3011,7 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
             &&   (vk->mailbox.swapchain != VK_NULL_HANDLE))
       {
          VkResult res = VK_SUCCESS;
-         /* We are tearing down, and entering a state 
+         /* We are tearing down, and entering a state
           * where we are supposed to have
           * acquired an image, so block until we have acquired. */
          if (! (vk->context.flags & VK_CTX_FLAG_HAS_ACQUIRED_SWAPCHAIN))
@@ -3068,21 +3068,18 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
       if (!swap_interval && present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
       {
          swapchain_present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-         RARCH_LOG("SET TO MAILBOX PRESENT MODE\n"); //QNX DEBUG
          break;
       }
       else if (!swap_interval && present_modes[i]
             == VK_PRESENT_MODE_IMMEDIATE_KHR)
       {
          swapchain_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-         RARCH_LOG("SET TO IMMEDIATE PRESENT MODE\n"); //QNX DEBUG
          break;
       }
       else if (swap_interval && present_modes[i] == VK_PRESENT_MODE_FIFO_KHR)
       {
          /* Kind of tautological since FIFO must always be present. */
          swapchain_present_mode = VK_PRESENT_MODE_FIFO_KHR;
-         RARCH_LOG("SET TO FIFO PRESENT MODE\n"); //QNX DEBUG
          break;
       }
    }
@@ -3109,7 +3106,7 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
       {
          RARCH_ERR("[Vulkan]: Surface has no formats.\n");
          return false;
-      }  
+      }
 
 #ifdef VULKAN_HDR_SWAPCHAIN
       if (settings->bools.video_hdr_enable)
@@ -3243,7 +3240,7 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
    info.imageExtent.height     = swapchain_size.height;
    info.imageArrayLayers       = 1;
    info.imageUsage             =  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-	   			| VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
+	   			| VK_IMAGE_USAGE_TRANSFER_SRC_BIT
 				| VK_IMAGE_USAGE_TRANSFER_DST_BIT;
    info.imageSharingMode       = VK_SHARING_MODE_EXCLUSIVE;
    info.queueFamilyIndexCount  = 0;
@@ -3261,7 +3258,6 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
    if (old_swapchain != VK_NULL_HANDLE)
       vkDestroySwapchainKHR(vk->context.device, old_swapchain, NULL);
 #endif
-   //info.imageFormat =VK_FORMAT_B8G8R8A8_UNORM; //QNX DEBUG
    RARCH_LOG("[Vulkan/Debug] Format: %d.\n", info.imageFormat);
    if (vkCreateSwapchainKHR(vk->context.device,
             &info, NULL, &vk->swapchain) != VK_SUCCESS)

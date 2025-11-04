@@ -48,7 +48,9 @@ screen_window_t* screen_win_qnx = NULL;
 /*### Vulkan ###*/
 #include "../common/vulkan_common.h"
 
-#define QNX_FORMAT SCREEN_FORMAT_RGBX8888 //QNX DEBUG
+#ifdef DEBUG
+#define QNX_FORMAT SCREEN_FORMAT_RGBX8888
+#endif
 
 /*##############################################*/
 /*                  Structures                  */
@@ -240,8 +242,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
  * Initializes the gfx context
  */
 static void *qnx_gfx_ctx_vk_init(void *video_driver) {
-
-
+#ifndef DEBUG
    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
    if(!qnx)
    {
@@ -256,13 +257,16 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
       free(qnx);
       return NULL;
    }
+#endif
 
    screen_context_t* screen_ctx = malloc(sizeof(screen_context_t));
    screen_window_t* screen_win = malloc(sizeof(screen_window_t));
    if(screen_create_context(screen_ctx, SCREEN_APPLICATION_CONTEXT))
    {
       RARCH_ERR("[Screen/VK]: Fatal: Context init failed with errno %d (%s).\n", errno, strerror(errno));
+#ifndef DEBUG
       free(qnx);
+#endif
       return false;
    }
 
@@ -271,42 +275,44 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver) {
       RARCH_ERR("[Screen/VK]: Fatal: Window init failed with errno %d (%s).\n", errno, strerror(errno));
       screen_destroy_context(*screen_ctx);
       free(screen_ctx);
+#ifndef DEBUG
       free(qnx);
+#endif
       return false;
    }
+
+#ifdef DEBUG
+   int form = QNX_FORMAT;
+   if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_FORMAT,&form))
+       RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d (%s).\n", errno, strerror(errno));
+
+   RARCH_LOG("[Screen/VK]: Context, Window initialized.\n");
+
+   qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
+   if(!qnx)
+   {
+       RARCH_ERR("[Screen/VK]: Fatal: Could not create a data pointer errno %d (%s).\n", errno, strerror(errno));
+       screen_destroy_window(*screen_win);
+       screen_destroy_context(*screen_ctx);
+       free(screen_win);
+       free(screen_ctx);
+       return false;
+   }
+
+   RARCH_LOG("[Screen/VK]: Initializing vulkan context...\n");
+   if(!vulkan_context_init(&qnx->vk, VULKAN_WSI_QNX))
+   {
+       RARCH_ERR("[Screen/VK]: Failed to initialize vulkan context. Destroying Window and Context.\n");
+       qnx_gfx_ctx_vk_destroy(qnx);
+       free(screen_win);
+       free(screen_ctx);
+       return NULL;
+   }
+#endif
 
    int usage = SCREEN_USAGE_VULKAN;
    if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_USAGE, &usage))
       RARCH_WARN("[Screen/VK]: Could not set window type to SCREEN_USAGE VULKAN, errno %d (%s).\n", errno, strerror(errno));
-
-   // int form = QNX_FORMAT;
-   // if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_FORMAT,&form))
-   //     RARCH_ERR("[Screen/VK]: Failed to set format for window with errno %d (%s).\n", errno, strerror(errno));
-
-   // RARCH_LOG("[Screen/VK]: Context, Window initialized.\n");
-
-   /*
-    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
-    if(!qnx)
-    {
-        RARCH_ERR("[Screen/VK]: Fatal: Could not create a data pointer errno %d (%s).\n", errno, strerror(errno));
-        screen_destroy_window(*screen_win);
-        screen_destroy_context(*screen_ctx);
-        free(screen_win);
-        free(screen_ctx);
-        return false;
-    }
-
-    RARCH_LOG("[Screen/VK]: Initializing vulkan context...\n");
-    if(!vulkan_context_init(&qnx->vk, VULKAN_WSI_QNX))
-    {
-        RARCH_ERR("[Screen/VK]: Failed to initialize vulkan context. Destroying Window and Context.\n");
-        qnx_gfx_ctx_vk_destroy(qnx);
-        free(screen_win);
-        free(screen_ctx);
-        return NULL;
-    }
-    */
 
    qnx->ctx  = *screen_ctx;
    qnx->win  = *screen_win;
