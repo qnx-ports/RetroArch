@@ -23,10 +23,14 @@
 /*### System Headers ###*/
 #include <libgen.h>
 #include <dirent.h>
+#include <unistd.h>
 
 /*### Standard Headers ###*/
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
+
+/*### Third-party Headers ###*/
+#include <file/file_path.h>
 
 /*### Retro Arch ###*/
 #include "../../defaults.h"
@@ -135,7 +139,7 @@ static void frontend_qnx_get_env_settings(int *argc, char *argv[], void *data, v
 		   data_path, "assets", sizeof(data_assets_path));
 
    if (!filestream_exists(data_assets_path)){
-      char copy_command[PATH_MAX] = {0};
+      char copy_command[(2 * PATH_MAX) + 8] = {0};
 
       snprintf(copy_command,
             sizeof(copy_command),

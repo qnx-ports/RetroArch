@@ -59,6 +59,8 @@ typedef struct
 /* TODO/FIXME - globals with public scope */
 #include "../../qnx/qnx_common_ctx.h"
 
+screen_context_t* screen_ctx_qnx = NULL;
+screen_window_t* screen_win_qnx = NULL;
 
 /**
  * gfx_ctx_qnx_destroy:
@@ -68,11 +70,27 @@ static void gfx_ctx_qnx_destroy(void *data)
 {
    qnx_ctx_data_t *qnx = (qnx_ctx_data_t*)data;
 
+   if (qnx != NULL)
+   {
+
 #ifdef HAVE_EGL
-   egl_destroy(&qnx->egl);
+      egl_destroy(&qnx->egl);
 #endif
 
-   free(data);
+      free(qnx);
+   }
+   if (screen_ctx_qnx != NULL)
+   {
+      screen_destroy_context(*screen_ctx_qnx);
+      free(screen_ctx_qnx);
+      screen_ctx_qnx = NULL;
+   }
+   if (screen_win_qnx != NULL)
+   {
+      screen_destroy_window(*screen_win_qnx);
+      free(screen_win_qnx);
+      screen_win_qnx = NULL;
+   }
 }
 
 /**
@@ -113,20 +131,30 @@ static void *gfx_ctx_qnx_init(void *video_driver)
    int screen_resolution[2];
 
    /* Allocate screen context */
-   qnx_ctx_data_t *qnx         = (qnx_ctx_data_t*)calloc(1, sizeof(*qnx));
-   if (!qnx)
+   qnx_ctx_data_t *qnx         = (qnx_ctx_data_t*)malloc(sizeof(*qnx));
+   if (qnx == NULL)
    {
+      RARCH_ERR("malloc failed with errno %d (%s).\n", errno, strerror(errno));
       goto screen_error;
    }
 
    /* Create a screen context that will be used to
        * create an EGL surface to receive libscreen events */
    RARCH_LOG("Initializing screen context...\n");
-   if (!screen_ctx_qnx)
+   if (screen_ctx_qnx == NULL)
    {
-      if (screen_create_context(&screen_ctx_qnx, 0) != 0 )
+      screen_ctx_qnx = (screen_context_t *) malloc(sizeof(screen_context_t));
+      if (screen_ctx_qnx == NULL)
       {
+         RARCH_ERR("malloc failed with errno %d (%s).\n", errno, strerror(errno));
+         goto screen_error;
+      }
+      if (screen_create_context(screen_ctx_qnx, 0) != 0 )
+      {
+         free(screen_ctx_qnx);
+         screen_ctx_qnx = NULL;
          RARCH_ERR("screen_request_events failed with errno %d (%s).\n", errno, strerror(errno));
+         goto screen_error;
       }
    }
 
@@ -142,17 +170,29 @@ static void *gfx_ctx_qnx_init(void *video_driver)
    }
 #endif
 
-   if (!screen_win_qnx)
+   if (screen_win_qnx == NULL)
    {
-      if (screen_create_window(&screen_win_qnx, screen_ctx_qnx) != 0)
+      screen_win_qnx = (screen_window_t*) malloc(sizeof(screen_window_t));
+      if (screen_win_qnx == NULL)
       {
+         free(screen_ctx_qnx);
+         screen_ctx_qnx = NULL;
+         RARCH_ERR("malloc failed with errno %d (%s).\n", errno, strerror(errno));
+         return NULL;
+      }
+      if (screen_create_window(screen_win_qnx, *screen_ctx_qnx) != 0)
+      {
+         free(screen_ctx_qnx);
+         screen_ctx_qnx = NULL;
+         free(screen_win_qnx);
+         screen_win_qnx = NULL;
          RARCH_ERR("screen_create_window failed with errno %d (%s).\n", errno, strerror(errno));
          goto error;
       }
    }
 
    format = SCREEN_FORMAT_RGBX8888;
-   if (screen_set_window_property_iv(screen_win_qnx, SCREEN_PROPERTY_FORMAT, &format))
+   if (screen_set_window_property_iv(*screen_win_qnx, SCREEN_PROPERTY_FORMAT, &format))
    {
       RARCH_ERR("screen_set_window_property_iv [SCREEN_PROPERTY_FORMAT] failed with errno %d (%s).\n", errno, strerror(errno));
       goto error;
@@ -163,13 +203,13 @@ static void *gfx_ctx_qnx_init(void *video_driver)
 #elif HAVE_OPENGLES3
    usage = SCREEN_USAGE_OPENGL_ES3 | SCREEN_USAGE_ROTATION;
 #endif
-   if (screen_set_window_property_iv(screen_win_qnx, SCREEN_PROPERTY_USAGE, &usage))
+   if (screen_set_window_property_iv(*screen_win_qnx, SCREEN_PROPERTY_USAGE, &usage))
    {
       RARCH_ERR("screen_set_window_property_iv [SCREEN_PROPERTY_USAGE] failed with errno %d (%s).\n", errno, strerror(errno));
       goto error;
    }
 
-   if (screen_get_window_property_pv(screen_win_qnx, SCREEN_PROPERTY_DISPLAY, (void **)&qnx->screen_disp))
+   if (screen_get_window_property_pv(*screen_win_qnx, SCREEN_PROPERTY_DISPLAY, (void **)&qnx->screen_disp))
    {
       RARCH_ERR("screen_get_window_property_pv [SCREEN_PROPERTY_DISPLAY] failed with errno %d (%s).\n", errno, strerror(errno));
       goto error;
@@ -191,7 +231,7 @@ static void *gfx_ctx_qnx_init(void *video_driver)
       goto error;
    }
 
-   if (screen_get_window_property_iv(screen_win_qnx,
+   if (screen_get_window_property_iv(*screen_win_qnx,
                                      SCREEN_PROPERTY_BUFFER_SIZE, size))
    {
       RARCH_ERR("screen_get_window_property_iv [SCREEN_PROPERTY_BUFFER_SIZE] failed with errno %d (%s).\n", errno, strerror(errno));
@@ -224,27 +264,27 @@ static void *gfx_ctx_qnx_init(void *video_driver)
       goto error;
    }
 
-   if (screen_set_window_property_iv(screen_win_qnx,
+   if (screen_set_window_property_iv(*screen_win_qnx,
                                      SCREEN_PROPERTY_BUFFER_SIZE, buffer_size))
    {
       RARCH_ERR("screen_set_window_property_iv [SCREEN_PROPERTY_BUFFER_SIZE] failed with errno %d (%s).\n", errno, strerror(errno));
       goto error;
    }
 
-   if (screen_set_window_property_iv(screen_win_qnx,
+   if (screen_set_window_property_iv(*screen_win_qnx,
                                      SCREEN_PROPERTY_ROTATION, &angle))
    {
       RARCH_ERR("screen_set_window_property_iv [SCREEN_PROPERTY_ROTATION] failed with errno %d (%s).\n", errno, strerror(errno));
       goto error;
    }
 
-   if (screen_create_window_buffers(screen_win_qnx, WINDOW_BUFFERS))
+   if (screen_create_window_buffers(*screen_win_qnx, WINDOW_BUFFERS))
    {
       RARCH_ERR("screen_create_window_buffers failed with errno %d (%s).\n", errno, strerror(errno));
       goto error;
    }
 
-   if (!egl_create_surface(&qnx->egl, screen_win_qnx))
+   if (!egl_create_surface(&qnx->egl, *screen_win_qnx))
    {
       goto error;
    }
@@ -255,7 +295,23 @@ static void *gfx_ctx_qnx_init(void *video_driver)
    egl_report_error();
    gfx_ctx_qnx_destroy(video_driver);
    screen_error:
-   //screen_stop_events(screen_ctx_qnx);
+   if (qnx != NULL)
+   {
+      free(qnx);
+   }
+   if (screen_ctx_qnx != NULL)
+   {
+      screen_destroy_context(*screen_ctx_qnx);
+      free(screen_ctx_qnx);
+      screen_ctx_qnx = NULL;
+   }
+   if (screen_win_qnx != NULL)
+   {
+      screen_destroy_window(*screen_win_qnx);
+      free(screen_win_qnx);
+      screen_win_qnx = NULL;
+   }
+
    return NULL;
 }
 

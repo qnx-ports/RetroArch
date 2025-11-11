@@ -32,13 +32,12 @@
 #include <errno.h>
 #include <string.h>
 #include "../../qnx/qnx_common_ctx.h"
-screen_context_t* screen_ctx_qnx = NULL;
-screen_window_t* screen_win_qnx = NULL;
 
 /*### Retro Arch ###*/
 #include "../../config.h"
 #include "../../configuration.h"
 #include "../../verbosity.h"
+#include "../video_defines.h"
 #include <retro_timers.h>
 
 #include "../include/vulkan/vulkan.h"
@@ -57,8 +56,8 @@ screen_window_t* screen_win_qnx = NULL;
 /*##############################################*/
 typedef struct {
    gfx_ctx_vulkan_data_t vk;
-   screen_context_t ctx;
-   screen_window_t win;
+   screen_context_t *ctx;
+   screen_window_t *win;
    unsigned width;
    unsigned height;
    unsigned swap_interval;
@@ -80,16 +79,20 @@ static void qnx_gfx_ctx_vk_destroy(void *data)
    {
       return;
    }
-   vulkan_context_destroy(&qnx->vk, qnx->ctx);
+   vulkan_context_destroy(&qnx->vk, *qnx->ctx);
 
    if (qnx->vk.context.queue_lock)
    {
       slock_free(qnx->vk.context.queue_lock);
    }
-   screen_destroy_window(qnx->win);
-   screen_destroy_context(qnx->ctx);
+   screen_destroy_window(*qnx->win);
+   screen_destroy_context(*qnx->ctx);
+   free(screen_ctx_qnx);
+   free(screen_win_qnx);
    free(data);
 
+   screen_ctx_qnx = NULL;
+   screen_win_qnx = NULL;
 } /*qnx_gfx_ctx_vk_destroy*/
 
 static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
@@ -107,9 +110,9 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
    RARCH_LOG("=============================\n");
    RARCH_LOG("QNX Display, Ctx, Window Info\n");
    RARCH_LOG("=============================\n");
-   RARCH_LOG("[Screen/VK]: Addresses: ctx %u win %u\n", qnx->ctx, qnx->win);
+   RARCH_LOG("[Screen/VK]: Addresses: ctx %p win %p\n", qnx->ctx, qnx->win);
 
-   if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_ID_STRING, len, buf))
+   if(screen_get_context_property_cv(*qnx->ctx, SCREEN_PROPERTY_ID_STRING, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for id_str with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -118,7 +121,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Context ID String: %s\n", buf);
    }
 
-   if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_PRODUCT, len, buf))
+   if(screen_get_context_property_cv(*qnx->ctx, SCREEN_PROPERTY_PRODUCT, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for pid with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -127,7 +130,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Context Product ID String: %s\n", buf);
    }
 
-   if(screen_get_context_property_cv(qnx->ctx, SCREEN_PROPERTY_ID, len, buf))
+   if(screen_get_context_property_cv(*qnx->ctx, SCREEN_PROPERTY_ID, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for vid with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -136,7 +139,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Context ID (Generated): %s\n", buf);
    }
 
-   if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_STATUS, &buf_i))
+   if(screen_get_context_property_iv(*qnx->ctx, SCREEN_PROPERTY_STATUS, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for status with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -145,7 +148,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
    RARCH_LOG("[Screen/VK]: Context Status: %d [0=DESTRYD., 1=CREATED]\n", buf_i);
    }
 
-   if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_TYPE, &buf_i))
+   if(screen_get_context_property_iv(*qnx->ctx, SCREEN_PROPERTY_TYPE, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for type with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -154,7 +157,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Context Type: %d [0=APP, 1=WIN_MGR, 2=INP_PVDR, 4=PWR_MGR, 8=DISP_MGR, 16=INP_MGR, 32=BUF_PVR]\n", buf_i);
    }
 
-   if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_WINDOW_COUNT, &buf_i))
+   if(screen_get_context_property_iv(*qnx->ctx, SCREEN_PROPERTY_WINDOW_COUNT, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for Window count with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -163,7 +166,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Context Window Count: %d\n", buf_i);
    }
 
-   if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_IDLE_STATE, &buf_i))
+   if(screen_get_context_property_iv(*qnx->ctx, SCREEN_PROPERTY_IDLE_STATE, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for idle state with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -174,7 +177,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
 
    RARCH_LOG("-----------------------------\n");
 
-   if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_ID, len, buf))
+   if(screen_get_window_property_cv(*qnx->win, SCREEN_PROPERTY_ID, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for id with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -183,7 +186,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window ID (generated): %s\n", buf);
    }
 
-   if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_ID_STRING, len, buf))
+   if(screen_get_window_property_cv(*qnx->win, SCREEN_PROPERTY_ID_STRING, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for id_str with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -192,7 +195,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window ID String: %s\n", buf);
    }
 
-   if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_CLASS, len, buf))
+   if(screen_get_window_property_cv(*qnx->win, SCREEN_PROPERTY_CLASS, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for class with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -201,7 +204,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window Class: %s\n", buf);
    }
 
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_TYPE, &buf_i))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_TYPE, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for type with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -210,7 +213,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window Type: %d [0=app, 1=child, 2=embed, 4=root]\n", buf_i);
    }
 
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &buf_i))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for render buffer count with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -219,7 +222,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window Render Buffer Count: %d\n", buf_i);
    }
 
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_STATUS, &buf_i))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_STATUS, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for status with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -228,7 +231,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window Status: %d [<0=ERROR, 0=DESTRYD., 1=CREATED, 2=REALIZ., 3=INVIS., 4/5=OBSC. , 9=VISIB., 10=FULL VIS., 11=FULLSCR.]\n", buf_i);
    }
 
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_VISIBLE, &buf_i))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_VISIBLE, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for visibility with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -237,7 +240,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window Visibility: %d\n", buf_i);
    }
 
-   if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_GROUP, len, buf))
+   if(screen_get_window_property_cv(*qnx->win, SCREEN_PROPERTY_GROUP, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for group with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -246,7 +249,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window Group: %s\n", buf);
    }
 
-   if(screen_get_window_property_cv(qnx->win, SCREEN_PROPERTY_PARENT, len, buf))
+   if(screen_get_window_property_cv(*qnx->win, SCREEN_PROPERTY_PARENT, len, buf))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for parent with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -255,7 +258,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       RARCH_LOG("[Screen/VK]: Window Parent: %s\n", buf);
    }
 
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_FORMAT, &buf_i))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_FORMAT, &buf_i))
    {
       RARCH_LOG("[Screen/VK]: Failed to query window for type with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -267,7 +270,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
    RARCH_LOG("-----------------------------\n");
 
    int num_disps = 0;
-   if(screen_get_context_property_iv(qnx->ctx, SCREEN_PROPERTY_DISPLAY_COUNT, &num_disps))
+   if(screen_get_context_property_iv(*qnx->ctx, SCREEN_PROPERTY_DISPLAY_COUNT, &num_disps))
    {
       RARCH_LOG("[Screen/VK]: Failed to query context for display pointers with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -277,7 +280,7 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
       if(num_disps > 0)
       {
          screen_display_t* disps = malloc(sizeof(screen_display_t)*num_disps);
-         if(screen_get_context_property_pv(qnx->ctx, SCREEN_PROPERTY_DISPLAYS, disps))
+         if(screen_get_context_property_pv(*qnx->ctx, SCREEN_PROPERTY_DISPLAYS, disps))
          {
             RARCH_LOG("[Screen/VK]: %d display(s) detected in context.\n");
          }
@@ -365,11 +368,11 @@ static void get_display_info_qnx(qnx_ctx_data_vk_t* qnx)
 static void *qnx_gfx_ctx_vk_init(void *video_driver)
 {
 #ifndef DEBUG
-   qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
+   qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*) malloc(sizeof(qnx_ctx_data_vk_t));
    if(!qnx)
    {
       RARCH_ERR("[Screen/VK]: Fatal: Could not create a data pointer with errno %d (%s).\n", errno, strerror(errno));
-      return false;
+      return NULL;
    }
 
    RARCH_LOG("[Screen/VK]: Initializing vulkan context...\n");
@@ -381,26 +384,49 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver)
    }
 #endif
 
-   screen_context_t* screen_ctx = malloc(sizeof(screen_context_t));
-   screen_window_t* screen_win = malloc(sizeof(screen_window_t));
-   if(screen_create_context(screen_ctx, SCREEN_APPLICATION_CONTEXT))
+   if (screen_ctx_qnx != NULL)
    {
-      RARCH_ERR("[Screen/VK]: Fatal: Context init failed with errno %d (%s).\n", errno, strerror(errno));
+      screen_context_t* screen_ctx = (screen_context_t*) malloc(sizeof(screen_context_t));
+      if (screen_ctx == NULL)
+      {
+         RARCH_ERR("[Screen/VK]: Fatal: malloc failed with errno %d (%s).\n", errno, strerror(errno));
+         return NULL;
+      }
+      if(screen_create_context(screen_ctx, SCREEN_APPLICATION_CONTEXT))
+      {
+         RARCH_ERR("[Screen/VK]: Fatal: Context init failed with errno %d (%s).\n", errno, strerror(errno));
+         free(screen_ctx);
 #ifndef DEBUG
-      free(qnx);
+         free(qnx);
 #endif
-      return false;
+         return NULL;
+      }
+      screen_ctx_qnx = screen_ctx;
    }
 
-   if(screen_create_window(screen_win, *screen_ctx))
+   if (screen_win_qnx != NULL)
    {
-      RARCH_ERR("[Screen/VK]: Fatal: Window init failed with errno %d (%s).\n", errno, strerror(errno));
-      screen_destroy_context(*screen_ctx);
-      free(screen_ctx);
+      screen_window_t* screen_win = (screen_window_t*) malloc(sizeof(screen_window_t));
+      if (screen_win == NULL)
+      {
+         RARCH_ERR("[Screen/VK]: Fatal: malloc failed with errno %d (%s).\n", errno, strerror(errno));
+         free(screen_ctx_qnx);
+         screen_ctx_qnx = NULL;
+         return NULL;
+      }
+      if(screen_create_window(screen_win, *screen_ctx_qnx))
+      {
+         RARCH_ERR("[Screen/VK]: Fatal: Window init failed with errno %d (%s).\n", errno, strerror(errno));
+         screen_destroy_context(*screen_ctx_qnx);
+         free(screen_ctx_qnx);
+         screen_ctx_qnx = NULL;
+         free(screen_win);
 #ifndef DEBUG
-      free(qnx);
+         free(qnx);
 #endif
-      return false;
+         return NULL;
+      }
+      screen_win_qnx = screen_win;
    }
 
 #ifdef DEBUG
@@ -412,42 +438,44 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver)
 
    RARCH_LOG("[Screen/VK]: Context, Window initialized.\n");
 
-   qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)calloc(1, sizeof(*qnx));
+   qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*) malloc(sizeof(*qnx));
    if(!qnx)
    {
-       RARCH_ERR("[Screen/VK]: Fatal: Could not create a data pointer errno %d (%s).\n", errno, strerror(errno));
-       screen_destroy_window(*screen_win);
-       screen_destroy_context(*screen_ctx);
-       free(screen_win);
-       free(screen_ctx);
-       return false;
+      RARCH_ERR("[Screen/VK]: Fatal: Could not create a data pointer errno %d (%s).\n", errno, strerror(errno));
+      screen_destroy_window(*screen_win_qnx);
+      screen_destroy_context(*screen_ctx_qnx);
+      free(screen_win_qnx);
+      free(screen_ctx_qnx);
+      screen_ctx_qnx = NULL;
+      screen_win_qnx = NULL;
+      return NULL;
    }
 
    RARCH_LOG("[Screen/VK]: Initializing vulkan context...\n");
    if(!vulkan_context_init(&qnx->vk, VULKAN_WSI_QNX))
    {
-       RARCH_ERR("[Screen/VK]: Failed to initialize vulkan context. Destroying Window and Context.\n");
-       qnx_gfx_ctx_vk_destroy(qnx);
-       free(screen_win);
-       free(screen_ctx);
-       return NULL;
+      RARCH_ERR("[Screen/VK]: Failed to initialize vulkan context. Destroying Window and Context.\n");
+      qnx_gfx_ctx_vk_destroy(qnx);
+      free(screen_win_qnx);
+      free(screen_ctx_qnx);
+      screen_ctx_qnx = NULL;
+      screen_win_qnx = NULL;
+      return NULL;
    }
 #endif
 
    int usage = SCREEN_USAGE_VULKAN;
-   if(screen_set_window_property_iv(*screen_win, SCREEN_PROPERTY_USAGE, &usage))
+   if(screen_set_window_property_iv(*screen_win_qnx, SCREEN_PROPERTY_USAGE, &usage))
    {
       RARCH_WARN("[Screen/VK]: Could not set window type to SCREEN_USAGE VULKAN, errno %d (%s).\n", errno, strerror(errno));
    }
 
-   qnx->ctx  = *screen_ctx;
-   qnx->win  = *screen_win;
-   screen_ctx_qnx= &(qnx->ctx);
-   screen_win_qnx= &(qnx->win);
+   qnx->ctx = screen_ctx_qnx;
+   qnx->win = screen_win_qnx;
 
    int size[2] = {0,0}, swap_interval = 60;
    RARCH_LOG("[Screen/VK]: Getting screen size...\n");
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_SIZE, size))
    {
       RARCH_ERR("[Screen/VK]: Failed to get screen size with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -458,26 +486,23 @@ static void *qnx_gfx_ctx_vk_init(void *video_driver)
 
    get_display_info_qnx(qnx);
 
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
    {
       RARCH_ERR("[Screen/VK]: Failed to get screen size with errno %d (%s).\n", errno, strerror(errno));
-   {
+   }
 
    if(min(size[0], size[1]) < 0 || max(size[0], size[1]) > 100000)
    {
       RARCH_LOG("[Screen/VK]: Window size invalid! Setting to 1920x1080\n");
       size[0] = 1920;
       size[1] = 1080;
-      if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+      if(screen_set_window_property_iv(*qnx->win, SCREEN_PROPERTY_SIZE, size))
          RARCH_LOG("[Screen/VK]: Failed to set window size with errno %d (%s).\n", errno, strerror(errno));
    }
 
    qnx->width  = size[0];
    qnx->height = size[1];
    qnx->swap_interval = swap_interval;
-
-   free(screen_win);
-   free(screen_ctx);
 
    return qnx;
 } /*qnx_gfx_ctx_vk_init*/
@@ -515,12 +540,12 @@ static bool qnx_gfx_ctx_vk_set_video_mode(void *data,
    qnx->height = height;
 
    int size[2] = {width,height};
-   //if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+   //if(screen_set_window_property_iv(*qnx->win, SCREEN_PROPERTY_SIZE, &size))
    //{
    //     RARCH_ERR("[Screen/VK]: Failed to set screen sizes from window with errno %d (%s).", errno, strerror(errno));
    //}
 
-   if(!vulkan_surface_create(&qnx->vk, VULKAN_WSI_QNX, &qnx->ctx, &qnx->win, size[0], size[1], qnx->swap_interval))
+   if(!vulkan_surface_create(&qnx->vk, VULKAN_WSI_QNX, qnx->ctx, qnx->win, size[0], size[1], qnx->swap_interval))
    {
       RARCH_ERR("[Screen/VK]: Failed to create surface.\n");
       return false;
@@ -541,7 +566,7 @@ static void qnx_gfx_ctx_vk_set_swap_interval(void *data, int swap_interval)
    }
    qnx->swap_interval = swap_interval;
 
-   if(screen_set_window_property_iv(qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
+   if(screen_set_window_property_iv(*qnx->win, SCREEN_PROPERTY_SWAP_INTERVAL, &swap_interval))
    {
       RARCH_ERR("[Screen/VK]: Setting swap interval of window failed with errno %d (%s).\n", errno, strerror(errno));
    }
@@ -563,7 +588,7 @@ static void qnx_gfx_ctx_vk_get_video_size(void *data,
       return;
    }
    int size[2] = {0,0};
-   if(screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_SIZE, &size))
+   if(screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_SIZE, &size))
    {
       RARCH_ERR("[Screen/VK]: Failed to get video size with errno %d (%s). Setting default values...\n", errno, strerror(errno));
       //Lilliput Defaults
@@ -582,7 +607,7 @@ static bool qnx_gfx_ctx_vk_has_focus(void *data)
    uint_t focused = 0;
    qnx_ctx_data_vk_t *qnx = (qnx_ctx_data_vk_t*)data;
 
-   screen_get_window_property_iv(qnx->win, SCREEN_PROPERTY_FOCUS, &focused);
+   screen_get_window_property_iv(*qnx->win, SCREEN_PROPERTY_FOCUS, &focused);
    bool toret;
    toret = (focused != 0)? true: false;
 
@@ -604,7 +629,7 @@ static void qnx_gfx_ctx_vk_check_window(void *data,
    uint_t size[2];
    *quit=false; //TODO: CHECK VIA EVENTS
 
-   if(!screen_get_window_property_iv(qnx->ctx, SCREEN_PROPERTY_SIZE, &size)) {
+   if(!screen_get_window_property_iv(*qnx->ctx, SCREEN_PROPERTY_SIZE, &size)) {
       RARCH_LOG("[Screen/Vk]: Failed to get window size in check_window with errno %d (%s).\n", errno, strerror(errno));
    }
 
@@ -628,7 +653,7 @@ static int dpi_get_density(qnx_ctx_data_vk_t *qnx)
    }
 
    screen_device_t disp;
-   if(screen_get_window_property_pv(qnx->win, SCREEN_PROPERTY_DISPLAY, &disp))
+   if(screen_get_window_property_pv(*qnx->win, SCREEN_PROPERTY_DISPLAY, &disp))
    {
       RARCH_ERR("[Screen/Vk]: screen failed to get DPI with error %d (%s).\n", errno, strerror(errno));
       goto error;

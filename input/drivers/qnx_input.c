@@ -29,6 +29,32 @@
 /*##############################################*/
 /*               Functions              */
 /*##############################################*/
+static void qnx_init_controller(qnx_input_t *qnx,
+      qnx_input_device_t *controller);
+static int qnx_discover_controllers(qnx_input_t *qnx);
+static void *qnx_input_init(const char *joypad_driver);
+static void qnx_input_poll( void *data);
+static void qnx_handle_device(qnx_input_t *qnx, qnx_input_device_t* controller);
+static bool qnx_keyboard_pressed(qnx_input_t *qnx, unsigned id);
+static int16_t qnx_pointer_input_state(qnx_input_t *qnx,
+      unsigned idx,
+      unsigned id,
+      bool screen);
+static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id);
+static int screen_button_id_to_retro(unsigned id);
+static int retro_button_id_to_screen(unsigned id);
+static int16_t qnx_input_state(void *data,
+      const input_device_driver_t *joypad,
+      const input_device_driver_t *sec_joypad,
+      rarch_joypad_info_t *joypad_info,
+      const retro_keybind_set *binds,
+      bool keyboard_mapping_blocked,
+      unsigned port,
+      unsigned device,
+      unsigned idx,
+      unsigned id);
+static void qnx_input_free_input(void *data);
+static uint64_t qnx_input_get_capabilities(void *data);
 
 /*### Initialization ###*/
 
@@ -65,7 +91,98 @@ static void qnx_init_controller(qnx_input_t *qnx,
    memset(controller->id, 0, sizeof(controller->id));
 }
 
-static void *qnx_input_init(const char *joypad_driver){
+/**
+ * qnx_discover_controllers:
+ * Finds connected gamepads from screen.
+ */
+static int qnx_discover_controllers(qnx_input_t *qnx)
+{
+   /* Get array of connected devices */
+   int deviceCount = 0, ret;
+   unsigned i;
+   ret = screen_get_context_property_iv(*screen_ctx_qnx, SCREEN_PROPERTY_DEVICE_COUNT, &deviceCount);
+
+   /* Failed Query Error */
+   if (ret < 0)
+   {
+      RARCH_ERR("Error querying SCREEN_PROPERTY_DEVICE_COUNT: [%d] %s\n", errno, strerror(errno));
+      return false;
+   }
+
+   screen_device_t* devices_found = (screen_device_t*) calloc(deviceCount, sizeof(screen_device_t));
+
+   /* Allocation Error*/
+   if (!devices_found)
+   {
+      RARCH_ERR("Error allocating devices_found, deviceCount=%d\n", deviceCount);
+      return false;
+   }
+
+   ret = screen_get_context_property_pv(*screen_ctx_qnx, SCREEN_PROPERTY_DEVICES, (void**)devices_found);
+
+   /* Failed Query Error */
+   if (ret < 0)
+   {
+      RARCH_ERR("Error querying SCREEN_PROPERTY_DEVICES: [%d] %s\n", errno, strerror(errno));
+      return false;
+   }
+
+   /* Scan the list for gamepad and joystick devices. */
+   for (i = 0; i < qnx->pads_connected; i++)
+   {
+      qnx_init_controller(qnx, &qnx->devices[i]);
+   }
+
+   //make sure we keep track of how many are connected
+   qnx->pads_connected = 0;
+
+   //Guarantee that the first gamepad takes the slot
+   int gamepad_not_connected=1;
+
+   /* Check all devices */
+   for (i = 0; i < deviceCount; i++)
+   {
+      /* Query type */
+      int type;
+      screen_get_device_property_iv(devices_found[i], SCREEN_PROPERTY_TYPE, &type);
+
+      /* Make sure type is supported */
+      /* Note: Keyboard should not take up a slot, as it is stored separately.*/
+      if (type == SCREEN_EVENT_GAMEPAD  || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_POINTER)
+      {
+         if((type == SCREEN_EVENT_GAMEPAD || type == SCREEN_EVENT_JOYSTICK) && gamepad_not_connected)
+         {
+            qnx->devices[0].handle = devices_found[i];
+            qnx->devices[0].index = 0;
+            //printf("At index 0\n");
+            qnx_handle_device(qnx, &qnx->devices[0]);
+            gamepad_not_connected = 0;
+            if (qnx->pads_connected >= DEFAULT_MAX_PADS)
+            {
+               break;
+            }
+         }
+         else
+         {
+            qnx->devices[qnx->pads_connected+gamepad_not_connected].handle = devices_found[i];
+            qnx->devices[qnx->pads_connected+gamepad_not_connected].index = qnx->pads_connected+gamepad_not_connected;
+            //printf("At index %d\n", qnx->pads_connected+gamepad_not_connected);
+            qnx_handle_device(qnx, &qnx->devices[qnx->pads_connected+gamepad_not_connected]);
+            if (qnx->pads_connected+gamepad_not_connected >= DEFAULT_MAX_PADS)
+            {
+               break;
+            }
+         }
+      }
+   }
+
+   /* Cleanup */
+   free(devices_found);
+   return true;
+}
+
+static void *qnx_input_init(const char *joypad_driver)
+{
    int i;
    qnx_input_t *qnx = (qnx_input_t*)calloc(1, sizeof(*qnx));
 
@@ -233,12 +350,12 @@ static void qnx_input_poll( void *data)
 
 /*### Processing Events ###*/
 
-static void qnx_process_mouse_event(qnx_input_t *qnx,
+void qnx_process_mouse_event(qnx_input_t *qnx,
       screen_event_t screen_ev,
       int type)
 {
    int pos[2] = {0,0}, buttons=0;
-   screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_POSITION, &pos);
+   screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_POSITION, pos);
    screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_BUTTONS, &buttons);
 
    if(qnx->mouse.x>-1)
@@ -263,7 +380,7 @@ static void qnx_process_mouse_event(qnx_input_t *qnx,
  * qnx_process_keyboard_event:
  * Processes screen's keyboard input and adjusts the input state accordingly.
  */
-static void qnx_process_keyboard_event(qnx_input_t *qnx,
+void qnx_process_keyboard_event(qnx_input_t *qnx,
       screen_event_t screen_ev,
       int type)
 {
@@ -299,7 +416,7 @@ static void qnx_process_keyboard_event(qnx_input_t *qnx,
  * qnx_process_gamepad_event:
  * Processes screen's gamepad connections and updates the state of the system accordingly.
  */
-static void qnx_process_gamepad_event(qnx_input_t *qnx,
+void qnx_process_gamepad_event(qnx_input_t *qnx,
       screen_event_t screen_event, int type)
 {
    /* Prepping Variables */
@@ -346,16 +463,17 @@ static void qnx_process_gamepad_event(qnx_input_t *qnx,
  * qnx_process_joystick_event:
  * Processes screen's joystick connections and updates the state of the system accordingly.
  */
-static void qnx_process_joystick_event(qnx_input_t *qnx,
+void qnx_process_joystick_event(qnx_input_t *qnx,
       screen_event_t screen_ev,
       int type)
 {
    int displacement[2];
-   screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_DISPLACEMENT, displacement);
+   int status;
+   status = screen_get_event_property_iv(screen_ev, SCREEN_PROPERTY_DISPLACEMENT, displacement);
 
    //printf("Joystick Event\n");
 
-   if (displacement != 0)
+   if (status != 0)
    {
       qnx->trackpad_acc[0] += displacement[0];
       if (abs(qnx->trackpad_acc[0]) > TRACKPAD_THRESHOLD)
@@ -399,7 +517,7 @@ static void qnx_process_joystick_event(qnx_input_t *qnx,
  * qnx_process_touch_event:
  * Processes screen's touch related events and properly updates the state of the system.
  */
-static void qnx_process_touch_event(qnx_input_t *qnx,
+void qnx_process_touch_event(qnx_input_t *qnx,
       screen_event_t screen_ev,
       int type)
 {
@@ -606,7 +724,7 @@ static void qnx_handle_device(qnx_input_t *qnx, qnx_input_device_t* controller)
  * qnx_input_autodetect_gamepad:
  * automatically detect gamepad info and configure them.
  */
-static void qnx_input_autodetect_gamepad(qnx_input_t *qnx, qnx_input_device_t *controller){
+void qnx_input_autodetect_gamepad(qnx_input_t *qnx, qnx_input_device_t *controller){
    if (!qnx)
    {
       return;
@@ -633,96 +751,6 @@ static void qnx_input_autodetect_gamepad(qnx_input_t *qnx, qnx_input_device_t *c
       input_autoconfigure_connect(name_buf, NULL, "qnx", controller->port, *controller->vid, *controller->pid);
       qnx->pads_connected++;
    }
-}
-
-/**
- * qnx_discover_controllers:
- * Finds connected gamepads from screen.
- */
-static int qnx_discover_controllers(qnx_input_t *qnx)
-{
-   /* Get array of connected devices */
-   int deviceCount = 0, ret;
-   unsigned i;
-   ret = screen_get_context_property_iv(*screen_ctx_qnx, SCREEN_PROPERTY_DEVICE_COUNT, &deviceCount);
-
-   /* Failed Query Error */
-   if (ret < 0)
-   {
-      RARCH_ERR("Error querying SCREEN_PROPERTY_DEVICE_COUNT: [%d] %s\n", errno, strerror(errno));
-      return false;
-   }
-
-   screen_device_t* devices_found = (screen_device_t*) calloc(deviceCount, sizeof(screen_device_t));
-
-   /* Allocation Error*/
-   if (!devices_found)
-   {
-      RARCH_ERR("Error allocating devices_found, deviceCount=%d\n", deviceCount);
-      return false;
-   }
-
-   ret = screen_get_context_property_pv(*screen_ctx_qnx, SCREEN_PROPERTY_DEVICES, (void**)devices_found);
-
-   /* Failed Query Error */
-   if (ret < 0)
-   {
-      RARCH_ERR("Error querying SCREEN_PROPERTY_DEVICES: [%d] %s\n", errno, strerror(errno));
-      return false;
-   }
-
-   /* Scan the list for gamepad and joystick devices. */
-   for (i = 0; i < qnx->pads_connected; i++)
-   {
-      qnx_init_controller(qnx, &qnx->devices[i]);
-   }
-
-   //make sure we keep track of how many are connected
-   qnx->pads_connected = 0;
-
-   //Guarantee that the first gamepad takes the slot
-   int gamepad_not_connected=1;
-
-   /* Check all devices */
-   for (i = 0; i < deviceCount; i++)
-   {
-      /* Query type */
-      int type;
-      screen_get_device_property_iv(devices_found[i], SCREEN_PROPERTY_TYPE, &type);
-
-      /* Make sure type is supported */
-      /* Note: Keyboard should not take up a slot, as it is stored separately.*/
-      if (type == SCREEN_EVENT_GAMEPAD  || type == SCREEN_EVENT_JOYSTICK || type == SCREEN_EVENT_POINTER)
-      {
-         if((type == SCREEN_EVENT_GAMEPAD || type == SCREEN_EVENT_JOYSTICK) && gamepad_not_connected)
-         {
-            qnx->devices[0].handle = devices_found[i];
-            qnx->devices[0].index = 0;
-            //printf("At index 0\n");
-            qnx_handle_device(qnx, &qnx->devices[0]);
-            gamepad_not_connected = 0;
-            if (qnx->pads_connected >= DEFAULT_MAX_PADS)
-            {
-               break;
-            }
-         }
-         else
-         {
-            qnx->devices[qnx->pads_connected+gamepad_not_connected].handle = devices_found[i];
-            qnx->devices[qnx->pads_connected+gamepad_not_connected].index = qnx->pads_connected+gamepad_not_connected;
-            //printf("At index %d\n", qnx->pads_connected+gamepad_not_connected);
-            qnx_handle_device(qnx, &qnx->devices[qnx->pads_connected+gamepad_not_connected]);
-            if (qnx->pads_connected+gamepad_not_connected >= DEFAULT_MAX_PADS)
-            {
-               break;
-            }
-         }
-      }
-   }
-
-   /* Cleanup */
-   free(devices_found);
-   return true;
 }
 
 /*### State Processing ###*/
@@ -768,7 +796,10 @@ static int16_t qnx_pointer_input_state(qnx_input_t *qnx,
          return y;
       case RETRO_DEVICE_ID_POINTER_PRESSED:
          return (idx < qnx->pointer_count) && (x != -0x8000) && (y != -0x8000);
+      default:
+         break;
    }
+   return 0;
 }
 
 int16_t find_and_flush(int16_t *target, int16_t fval)
@@ -787,9 +818,9 @@ static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id)
    switch(id)
    {
       case RETRO_DEVICE_ID_MOUSE_X:
-         return find_and_flush(qnx->mouse.x_del, 0);
+         return find_and_flush(&qnx->mouse.x_del, 0);
       case RETRO_DEVICE_ID_MOUSE_Y:
-         return find_and_flush(qnx->mouse.y_del, 0);
+         return find_and_flush(&qnx->mouse.y_del, 0);
       case RETRO_DEVICE_ID_MOUSE_LEFT:
          return qnx->mouse.lmb;
       case RETRO_DEVICE_ID_MOUSE_MIDDLE:
@@ -801,7 +832,10 @@ static int16_t qnx_mouse_input_state(qnx_input_t *qnx, unsigned id)
    return 0;
 }
 
-static int screen_button_id_to_retro(unsigned id) { }
+static int screen_button_id_to_retro(unsigned id)
+{
+   return 0;
+}
 
 static int retro_button_id_to_screen(unsigned id)
 {
